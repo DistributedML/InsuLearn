@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
-	"cpsc538b/proj/bclass"
 	"flag"
 	"fmt"
+	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
 	"github.com/gonum/matrix/mat64"
 	"io/ioutil"
@@ -45,6 +45,7 @@ func main() {
 
 	//Initialize stuff
 	model = bclass.RegLSBasisC(x, y, 0.01, 2)
+	requestJoin()
 
 	//Initialize TCP Connection and listener
 	l, _ = net.ListenTCP("tcp", myaddr)
@@ -74,8 +75,9 @@ func connHandler(conn *net.TCPConn) {
 		// server is asking me to test
 		go testModel(msg.Id, msg.Model)
 	case "global_grant":
-		go testGlobal(msg.GModel)
 		// server is sending global model
+		gmodel = msg.GModel
+		//go testGlobal(msg.GModel)
 	default:
 		// respond to ping
 	}
@@ -86,7 +88,9 @@ func parseUserInput() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter command: ")
 	text, _ := reader.ReadString('\n')
-	ident := text[0 : len(text)-2]
+	//Windows adds its own strange carriage return, swap the following lines to fix it
+	//ident := text[0 : len(text)-2]
+	ident := text[0 : len(text)-1]
 	switch ident {
 	case "read":
 		x = readData(inputargs[3])
@@ -96,26 +100,43 @@ func parseUserInput() {
 		model = bclass.RegLSBasisC(x, y, 0.01, 2)
 		yt := model.Predict(x)
 		c, d := bclass.TestResults(yt, y)
-		fmt.Printf("Model Accuracy is: %v.\n", float64(c)/float64(d))
+		fmt.Printf("Model accuracy is: %v.\n", float64(c)/float64(d))
 	case "push":
 		yt := model.Predict(x)
 		c, d := bclass.TestResults(yt, y)
 		requestCommit(c, d)
-		fmt.Printf("Pushed local model to server.\n")
 	case "pull":
+		fmt.Printf("Requesting global model from server.\n")
 		requestGlobal()
-		fmt.Printf("Pulled global model from server.\n")
+	case "test":
+		yt := gmodel.Predict(x)
+		c, d := bclass.TestResults(yt, y)
+		fmt.Printf("Global model accuracy on local data is: %v.\n", float64(c)/float64(d))
 	case "who":
 		fmt.Println(name)
 	default:
-		fmt.Printf("Command not recognized: %v.\n", ident)
+		fmt.Printf("Command not recognized: %v.\n\n", ident)
+		fmt.Printf("Choose from the following commands\n")
+		fmt.Printf("read  -- Read data from disk\n")
+		fmt.Printf("train -- Train model from data (reports error)\n")
+		fmt.Printf("push  -- Push trained model to server\n")
+		fmt.Printf("pull  -- Obtain global model from server\n")
+		fmt.Printf("test  -- Test local data on global model\n")
+		fmt.Printf("who   -- Print node name\n\n")
 	}
+}
+
+func requestJoin() {
+	msg := message{cnum, name, myaddr.String(), 0, 0, model, gempty}
+	tcpSend(msg)
+	fmt.Printf("Asked server to join.\n")
 }
 
 func requestCommit(c, d int) {
 	cnum++
 	msg := message{cnum, name, "commit_request", c, d, model, gempty}
 	tcpSend(msg)
+	fmt.Printf("Pushed local model to server.\n")
 }
 
 func requestGlobal() {
@@ -124,22 +145,22 @@ func requestGlobal() {
 }
 
 func testModel(id int, testmodel bclass.Model) {
-	fmt.Println("Received test requset.")
+	fmt.Printf("\nReceived test requset.\nEnter command: ")
 	yt := testmodel.Predict(x)
 	c, d := bclass.TestResults(yt, y)
 	msg := message{id, name, "test_complete", c, d, testmodel, gempty}
 	tcpSend(msg)
-	fmt.Println("Completed test requset.")
+	fmt.Printf("\nCompleted test requset.\nEnter command: ")
 }
 
-func testGlobal(g bclass.GlobalModel) {
-	gmodel = g
-	yt := model.Predict(x)
-	yg := gmodel.Predict(x)
-	ct, dt := bclass.TestResults(yt, y)
-	cg, dg := bclass.TestResults(yg, y)
-	fmt.Println("Model accuracy: Local", float64(ct)/float64(dt), ", Global", float64(cg)/float64(dg))
-}
+//func testGlobal(g bclass.GlobalModel) {
+//	gmodel = g
+//	yt := model.Predict(x)
+//	yg := gmodel.Predict(x)
+//	ct, dt := bclass.TestResults(yt, y)
+//	cg, dg := bclass.TestResults(yg, y)
+//	fmt.Printf("\nModel accuracy: Local (%v), Global (%v).\nEnter command: ", float64(ct)/float64(dt), float64(cg)/float64(dg))
+//}
 
 func tcpSend(msg message) {
 	conn, err := net.DialTCP("tcp", nil, svaddr)

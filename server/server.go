@@ -1,30 +1,41 @@
 package main
 
 import (
-	"cpsc538b/proj/bclass"
 	"flag"
 	"fmt"
+	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
-	//"github.com/gonum/matrix/mat64"
 	"io/ioutil"
 	"net"
-	//"strconv"
 	"os"
 	"strings"
 )
 
 var (
-	cnum   int = 0
-	myaddr *net.TCPAddr
-	client map[string]int
-	ctable map[int]int
-	claddr map[int]*net.TCPAddr
-	models map[int]bclass.Model
-	logger *govec.GoLog
-	l      *net.TCPListener
-	gmodel bclass.GlobalModel
-	gempty bclass.GlobalModel
+	cnum      int = 0
+	maxnode   int = 0
+	myaddr    *net.TCPAddr
+	cnumhist  map[int]int
+	client    map[string]int
+	claddr    map[int]*net.TCPAddr
+	tempmodel map[int]aggregate
+	testqueue map[int]map[int]bool
+	models    map[int]bclass.Model
+	modelC    map[int]int
+	modelD    int
+	channel   chan message
+	logger    *govec.GoLog
+	l         *net.TCPListener
+	gmodel    bclass.GlobalModel
+	gempty    bclass.GlobalModel
 )
+
+type aggregate struct {
+	cnum  int
+	model bclass.Model
+	c     int
+	d     int
+}
 
 type message struct {
 	Id     int
@@ -39,71 +50,30 @@ type message struct {
 func main() {
 	//Initialize stuff
 	client = make(map[string]int)
-	ctable = make(map[int]int)
 	claddr = make(map[int]*net.TCPAddr)
 	models = make(map[int]bclass.Model)
+	modelC = make(map[int]int)
+	modelD = 0
+	gmodel = bclass.GlobalModel{models, modelC, modelD}
+	tempmodel = make(map[int]aggregate)
+	testqueue = make(map[int]map[int]bool)
+	cnumhist = make(map[int]int)
+	channel = make(chan message)
+
+	go updateGlobal(channel)
 
 	//Parsing inputargs
 	parseArgs()
 
 	//Initialize TCP Connection and listener
 	l, _ = net.ListenTCP("tcp", myaddr)
-	fmt.Println("server initialized")
+	fmt.Printf("server initialized.\n")
 
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
 		go connHandler(conn)
 	}
-
-	//xg := ReadData("x.txt")
-	//yg := ReadData("y.txt")
-
-	//modlist := make(map[int]bclass.Model)
-	//X := make(map[int]*mat64.Dense)
-	//Y := make(map[int]*mat64.Dense)
-	//C := make(map[int]int)
-
-	//X[1] = ReadData("x1.txt")
-	//X[2] = ReadData("x2.txt")
-	//X[3] = ReadData("x3.txt")
-	//Y[1] = ReadData("y1.txt")
-	//Y[2] = ReadData("y2.txt")
-	//Y[3] = ReadData("y3.txt")
-
-	//for i := range X {
-	//	modlist[i] = bclass.RegLSBasisC(X[i], Y[i], 0.01, 2)
-	//	modlist[i].Print()
-	//}
-
-	//dmax := 0
-	//for k, model := range modlist {
-	//	C[k] = 0
-	//	dtemp := 0
-	//	for ktest := range modlist {
-	//		y := model.Predict(X[ktest])
-	//		c, d := bclass.TestResults(y, Y[ktest])
-	//		C[k] = C[k] + c
-	//		dtemp = dtemp + d
-	//	}
-	//	if dtemp > dmax {
-	//		dmax = dtemp
-	//	}
-	//}
-
-	//modelg := bclass.GlobalModel{modlist, C, dmax}
-
-	//yhat := modelg.Predict(xg)
-	//cg, dg := bclass.TestResults(yhat, yg)
-
-	////w := mat64.Formatted(Y[1], mat64.Prefix("    "))
-	////fmt.Printf("X_1:\nw = %v\n\n", w)
-
-	//modtot := bclass.RegLSBasisC(xg, yg, 0.01, 2)
-	//yhatot := modtot.Predict(xg)
-	//ct, dt := bclass.TestResults(yhatot, yg)
-
-	//fmt.Println(float64(cg)/float64(dg), float64(ct)/float64(dt))
 
 }
 
@@ -114,31 +84,81 @@ func connHandler(conn *net.TCPConn) {
 	logger.UnpackReceive("Received message", p, &msg)
 	switch msg.Type {
 	case "commit_request":
-		// node is sending a model, must forward to others for testing
-		fmt.Println("Received commit request.")
-		conn.Close()
-		go sendTestRequest(msg)
+		//node is sending a model, must forward to others for testing
+		fmt.Printf("Received commit request from %v.\n", msg.Name)
+		flag := checkQueue(client[msg.Name])
+		if flag {
+			conn.Close()
+			sendTestRequest(msg)
+		} else {
+			//denied
+			conn.Close()
+		}
 	case "global_request":
+		//node is requesting the global model, will forward
+		fmt.Printf("Received global model request from %v.\n", msg.Name)
+		sendGlobal(msg)
 		conn.Close()
-		// node is asking for global model
 	case "test_complete":
+		//node is submitting test results, will update its queue
+		fmt.Printf("Received completed test results from %v.\n", msg.Name)
+		testqueue[client[msg.Name]][cnumhist[msg.Id]] = false
 		conn.Close()
 		//update the pending commit and merge if complete
+		channel <- msg
 	default:
-		// respond to ping
+		processJoin(msg)
+		conn.Close()
+	}
+}
+
+func updateGlobal(ch chan message) {
+	// Function that aggregates the global model and commits when ready
+	for {
+		m := <-ch
+		id := cnumhist[m.Id]
+		tempAggregate := tempmodel[id]
+		tempAggregate.c += m.C
+		tempAggregate.d += m.D
+		tempmodel[id] = tempAggregate
+		if modelD < tempAggregate.d {
+			modelD = tempAggregate.d
+		}
+		if float64(tempAggregate.d) > float64(modelD)*0.8 {
+			models[id] = tempAggregate.model
+			modelC[id] = tempAggregate.c
+			gmodel = bclass.GlobalModel{models, modelC, modelD}
+			fmt.Printf("Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
+		}
 	}
 }
 
 func sendTestRequest(m message) {
 	cnum++
+	//initialize new aggregate
+	tempmodel[client[m.Name]] = aggregate{cnum, m.Model, m.C, m.D}
+	cnumhist[cnum] = client[m.Name]
 	for name, id := range client {
 		if id != client[m.Name] {
-			//forward test requst
+			//forward test request
 			msg := message{cnum, "server", "test_request", 0, 0, m.Model, gempty}
 			tcpSend(claddr[id], msg)
+			//increment tests in queue for that node
+			if queue, ok := testqueue[id]; !ok {
+				queue := make(map[int]bool)
+				queue[cnumhist[cnum]] = true
+				testqueue[id] = queue
+			} else {
+				queue[cnumhist[cnum]] = true
+			}
 			fmt.Printf("Sent test request to %v.\n", name)
 		}
 	}
+}
+
+func sendGlobal(m message) {
+	msg := message{m.Id, "server", "global_grant", 0, 0, m.Model, gmodel}
+	tcpSend(claddr[client[m.Name]], msg)
 }
 
 func tcpSend(addr *net.TCPAddr, msg message) {
@@ -149,37 +169,48 @@ func tcpSend(addr *net.TCPAddr, msg message) {
 	checkError(err)
 }
 
-//func tcpReply(msg message, conn *net.TCPConn) {
-//	//conn, err := net.DialTCP("TCP", svaddr)
-//	//checkError(err)
-//	outbuf := logger.PrepareSend(msg.Type, msg)
-//	conn.Write(outbuf)
-//}
+func checkQueue(id int) bool {
+	flag := true
+	for _, v := range testqueue[id] {
+		if flag && v {
+			flag = false
+		}
+	}
+	return flag
+}
+
+func processJoin(m message) {
+	id := maxnode
+	maxnode++
+	client[m.Name] = id
+	claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+	fmt.Printf("Added %v as node%v.\n", m.Name, id)
+}
 
 func parseArgs() {
 	flag.Parse()
 	inputargs := flag.Args()
 	var err error
 	if len(inputargs) < 2 {
-		fmt.Println("Not enough inputs")
+		fmt.Printf("Not enough inputs.\n")
 		return
 	}
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[0])
 	checkError(err)
-	getNodeAddr(inputargs[1])
-	logger = govec.Initialize(inputargs[2], inputargs[2])
+	logger = govec.Initialize(inputargs[1], inputargs[1])
 }
 
-func getNodeAddr(slavefile string) {
-	dat, err := ioutil.ReadFile(slavefile)
-	checkError(err)
-	nodestr := strings.Split(string(dat), "\n")
-	for i := 0; i < len(nodestr)-1; i++ {
-		nodeaddr := strings.Split(nodestr[i], " ")
-		client[nodeaddr[0]] = i
-		claddr[i], _ = net.ResolveTCPAddr("tcp", nodeaddr[1])
-	}
-}
+//func getNodeAddr(slavefile string) {
+//	dat, err := ioutil.ReadFile(slavefile)
+//	checkError(err)
+//	nodestr := strings.Split(string(dat), "\n")
+//	for i := 0; i < len(nodestr)-1; i++ {
+//		nodeaddr := strings.Split(nodestr[i], " ")
+//		client[nodeaddr[0]] = i
+//		claddr[i], _ = net.ResolveTCPAddr("tcp", nodeaddr[1])
+//		//testqueue[i] = 0
+//	}
+//}
 
 func checkError(err error) {
 	if err != nil {
