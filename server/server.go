@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
-	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 )
 
 var (
@@ -191,7 +189,7 @@ func parseArgs() {
 	flag.Parse()
 	inputargs := flag.Args()
 	var err error
-	if len(inputargs) < 2 {
+	if len(inputargs) < 1 {
 		fmt.Printf("Not enough inputs.\n")
 		return
 	}
