@@ -1,8 +1,8 @@
 package main
 
 import (
-	"cpsc538b/proj/bclass"
 	"fmt"
+	"github.com/4180122/distbayes/bclass"
 	"github.com/gonum/matrix/mat64"
 	"io/ioutil"
 	"strconv"
