@@ -15,7 +15,9 @@ import (
 )
 
 var (
-	cnum      int = 0
+	cnum      int     = 0
+	modeldeg  int     = 3
+	modellam  float64 = 0.01
 	name      string
 	inputargs []string
 	myaddr    *net.TCPAddr
@@ -44,12 +46,13 @@ func main() {
 	parseArgs()
 
 	//Initialize stuff
-	model = bclass.RegLSBasisC(x, y, 0.01, 2)
-	requestJoin()
+	model = bclass.RegLSBasisC(x, y, modellam, modeldeg)
 
 	//Initialize TCP Connection and listener
 	l, _ = net.ListenTCP("tcp", myaddr)
+	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
+	requestJoin()
 
 	//Main function of this server
 	for {
@@ -73,12 +76,16 @@ func connHandler(conn *net.TCPConn) {
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
+		conn.Write([]byte("OK"))
 		go testModel(msg.Id, msg.Model)
 	case "global_grant":
 		// server is sending global model
+		conn.Write([]byte("OK"))
 		gmodel = msg.GModel
+		fmt.Printf("\n <-- Pulled global model from server.\nEnter command: ")
 		//go testGlobal(msg.GModel)
 	default:
+		conn.Write([]byte("Unknown command."))
 		// respond to ping
 	}
 	conn.Close()
@@ -95,62 +102,63 @@ func parseUserInput() {
 	case "read":
 		x = readData(inputargs[3])
 		y = readData(inputargs[4])
-		fmt.Printf("Data updated.\n")
+		fmt.Printf(" --> Data updated.\n")
 	case "train":
-		model = bclass.RegLSBasisC(x, y, 0.01, 2)
+		model = bclass.RegLSBasisC(x, y, modellam, modeldeg)
 		yt := model.Predict(x)
 		c, d := bclass.TestResults(yt, y)
-		fmt.Printf("Model accuracy is: %v.\n", float64(c)/float64(d))
+		fmt.Printf(" --- Model accuracy is: %v.\n", float64(c)/float64(d))
 	case "push":
 		yt := model.Predict(x)
 		c, d := bclass.TestResults(yt, y)
 		requestCommit(c, d)
 	case "pull":
-		fmt.Printf("Requesting global model from server.\n")
 		requestGlobal()
 	case "test":
 		yt := gmodel.Predict(x)
 		c, d := bclass.TestResults(yt, y)
-		fmt.Printf("Global model accuracy on local data is: %v.\n", float64(c)/float64(d))
+		fmt.Printf(" --- Global model accuracy on local data is: %v.\n", float64(c)/float64(d))
 	case "who":
 		fmt.Println(name)
 	default:
-		fmt.Printf("Command not recognized: %v.\n\n", ident)
-		fmt.Printf("Choose from the following commands\n")
-		fmt.Printf("read  -- Read data from disk\n")
-		fmt.Printf("train -- Train model from data (reports error)\n")
-		fmt.Printf("push  -- Push trained model to server\n")
-		fmt.Printf("pull  -- Obtain global model from server\n")
-		fmt.Printf("test  -- Test local data on global model\n")
-		fmt.Printf("who   -- Print node name\n\n")
+		fmt.Printf(" Command not recognized: %v.\n\n", ident)
+		fmt.Printf("  Choose from the following commands\n")
+		fmt.Printf("  read  -- Read data from disk\n")
+		fmt.Printf("  train -- Train model from data (reports error)\n")
+		fmt.Printf("  push  -- Push trained model to server\n")
+		fmt.Printf("  pull  -- Obtain global model from server\n")
+		fmt.Printf("  test  -- Test local data on global model\n")
+		fmt.Printf("  who   -- Print node name\n\n")
 	}
 }
 
 func requestJoin() {
 	msg := message{cnum, name, myaddr.String(), 0, 0, model, gempty}
+	fmt.Printf(" --> Asking server to join.")
 	tcpSend(msg)
-	fmt.Printf("Asked server to join.\n")
 }
 
 func requestCommit(c, d int) {
 	cnum++
 	msg := message{cnum, name, "commit_request", c, d, model, gempty}
+	fmt.Printf(" --> Pushing local model to server.")
 	tcpSend(msg)
-	fmt.Printf("Pushed local model to server.\n")
 }
 
 func requestGlobal() {
 	msg := message{cnum, name, "global_request", 0, 0, model, gempty}
+	fmt.Printf(" --> Requesting global model from server.")
 	tcpSend(msg)
 }
 
 func testModel(id int, testmodel bclass.Model) {
-	fmt.Printf("\nReceived test requset.\nEnter command: ")
+	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
 	yt := testmodel.Predict(x)
 	c, d := bclass.TestResults(yt, y)
 	msg := message{id, name, "test_complete", c, d, testmodel, gempty}
+	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
-	fmt.Printf("\nCompleted test requset.\nEnter command: ")
+	fmt.Printf("Enter command: ")
 }
 
 //func testGlobal(g bclass.GlobalModel) {
@@ -163,11 +171,19 @@ func testModel(id int, testmodel bclass.Model) {
 //}
 
 func tcpSend(msg message) {
+	p := make([]byte, 1024)
 	conn, err := net.DialTCP("tcp", nil, svaddr)
 	checkError(err)
 	outbuf := logger.PrepareSend(msg.Type, msg)
 	_, err = conn.Write(outbuf)
 	checkError(err)
+	n, _ := conn.Read(p)
+	if string(p[:n]) != "OK" {
+		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
+	} else {
+		fmt.Printf(" [OK]\n")
+	}
+
 }
 
 func readData(filename string) *mat64.Dense {
