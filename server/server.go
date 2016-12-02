@@ -128,10 +128,11 @@ func updateGlobal(ch chan message) {
 		if modelD < tempAggregate.d {
 			modelD = tempAggregate.d
 		}
-		if float64(tempAggregate.d) > float64(modelD)*0.8 {
+		if float64(tempAggregate.d) > float64(modelD)*0.6 {
 			models[id] = tempAggregate.model
 			modelC[id] = tempAggregate.c
 			gmodel = bclass.GlobalModel{models, modelC, modelD}
+			logger.LogLocalEvent("commit_complete")
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
 		}
 	}
@@ -214,10 +215,10 @@ func processJoin(m message) {
 		for _, v := range tempmodel {
 			sendTestRequest(m.Name, id, v.cnum, v.model)
 		}
-		fmt.Println("!!!!!!", m.Name, client)
 	} else {
-		//node is rejoining resend the test request
+		//node is rejoining, update address and resend the unfinished test requests
 		id := client[m.Name]
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
 		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
 		for k, v := range testqueue[id] {
 			if v {

@@ -16,7 +16,7 @@ import (
 
 var (
 	cnum      int     = 0
-	modeldeg  int     = 3
+	modeldeg  int     = 2
 	modellam  float64 = 0.01
 	name      string
 	inputargs []string
@@ -26,6 +26,8 @@ var (
 	logger    *govec.GoLog
 	x         *mat64.Dense
 	y         *mat64.Dense
+	xt        *mat64.Dense
+	yt        *mat64.Dense
 	l         *net.TCPListener
 	gmodel    bclass.GlobalModel
 	gempty    bclass.GlobalModel
@@ -92,42 +94,56 @@ func connHandler(conn *net.TCPConn) {
 }
 
 func parseUserInput() {
+	var ident string
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter command: ")
 	text, _ := reader.ReadString('\n')
-	//Windows adds its own strange carriage return, swap the following lines to fix it
-	//ident := text[0 : len(text)-2]
-	ident := text[0 : len(text)-1]
+	//Windows adds its own strange carriage return, the following lines fix it
+	if text[len(text)-1] == '\n' {
+		ident = text[0 : len(text)-2]
+	} else {
+		ident = text[0 : len(text)-1]
+	}
 	switch ident {
 	case "read":
 		x = readData(inputargs[3])
 		y = readData(inputargs[4])
-		fmt.Printf(" --> Data updated.\n")
+		fmt.Printf(" --- Local data updated.\n")
 	case "train":
 		model = bclass.RegLSBasisC(x, y, modellam, modeldeg)
-		yt := model.Predict(x)
-		c, d := bclass.TestResults(yt, y)
-		fmt.Printf(" --- Model accuracy is: %v.\n", float64(c)/float64(d))
+		yh := model.Predict(x)
+		c, d := bclass.TestResults(yh, y)
+		fmt.Printf(" --- Local model accuracy on local data is: %v.\n", float64(c)/float64(d))
 	case "push":
-		yt := model.Predict(x)
-		c, d := bclass.TestResults(yt, y)
+		yh := model.Predict(x)
+		c, d := bclass.TestResults(yh, y)
 		requestCommit(c, d)
 	case "pull":
 		requestGlobal()
-	case "test":
-		yt := gmodel.Predict(x)
-		c, d := bclass.TestResults(yt, y)
+	case "valid":
+		yh := gmodel.Predict(x)
+		c, d := bclass.TestResults(yh, y)
 		fmt.Printf(" --- Global model accuracy on local data is: %v.\n", float64(c)/float64(d))
+	case "test":
+		yh := model.Predict(xt)
+		c, d := bclass.TestResults(yh, yt)
+		fmt.Printf(" --- Local model accuracy on test data is: %v.\n", float64(c)/float64(d))
+	case "testg":
+		yh := gmodel.Predict(xt)
+		c, d := bclass.TestResults(yh, yt)
+		fmt.Printf(" --- Global model accuracy on test data is: %v.\n", float64(c)/float64(d))
 	case "who":
-		fmt.Println(name)
+		fmt.Printf("%v\n", name)
 	default:
 		fmt.Printf(" Command not recognized: %v.\n\n", ident)
 		fmt.Printf("  Choose from the following commands\n")
 		fmt.Printf("  read  -- Read data from disk\n")
-		fmt.Printf("  train -- Train model from data (reports error)\n")
 		fmt.Printf("  push  -- Push trained model to server\n")
 		fmt.Printf("  pull  -- Obtain global model from server\n")
-		fmt.Printf("  test  -- Test local data on global model\n")
+		fmt.Printf("  train -- Train model from data (reports error)\n")
+		fmt.Printf("  valid -- Validate global model with local data\n")
+		fmt.Printf("  test  -- Test local model with test data\n")
+		fmt.Printf("  testg -- Test global model with test data\n")
 		fmt.Printf("  who   -- Print node name\n\n")
 	}
 }
@@ -153,22 +169,13 @@ func requestGlobal() {
 
 func testModel(id int, testmodel bclass.Model) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
-	yt := testmodel.Predict(x)
-	c, d := bclass.TestResults(yt, y)
+	yh := testmodel.Predict(x)
+	c, d := bclass.TestResults(yh, y)
 	msg := message{id, name, "test_complete", c, d, testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
 	fmt.Printf("Enter command: ")
 }
-
-//func testGlobal(g bclass.GlobalModel) {
-//	gmodel = g
-//	yt := model.Predict(x)
-//	yg := gmodel.Predict(x)
-//	ct, dt := bclass.TestResults(yt, y)
-//	cg, dg := bclass.TestResults(yg, y)
-//	fmt.Printf("\nModel accuracy: Local (%v), Global (%v).\nEnter command: ", float64(ct)/float64(dt), float64(cg)/float64(dg))
-//}
 
 func tcpSend(msg message) {
 	p := make([]byte, 1024)
@@ -183,7 +190,6 @@ func tcpSend(msg message) {
 	} else {
 		fmt.Printf(" [OK]\n")
 	}
-
 }
 
 func readData(filename string) *mat64.Dense {
@@ -208,7 +214,7 @@ func parseArgs() {
 	inputargs = flag.Args()
 	var err error
 	if len(inputargs) < 2 {
-		fmt.Println("Not enough inputs")
+		fmt.Printf("Not enough inputs.\n")
 		return
 	}
 	name = inputargs[0]
@@ -218,6 +224,8 @@ func parseArgs() {
 	checkError(err)
 	x = readData(inputargs[3])
 	y = readData(inputargs[4])
+	xt = readData("testdata/xv.txt")
+	yt = readData("testdata/yv.txt")
 	logger = govec.Initialize(inputargs[0], inputargs[5])
 }
 
