@@ -224,16 +224,14 @@ func main() {
 	//Initialize TCP Connection and listener
 
 	fmt.Printf("Server initialized.\n")
-	go func() {
-			connC, err := l.AcceptTCP()
-			checkError(err)
-			connHandler(connC)		
-		}()
 
 	for {
 
 			conn, _ := ln.AcceptTCP()
 			go nodes[InID].receive(conn)
+			connC, err := l.AcceptTCP()
+			checkError(err)
+			go connHandler(connC)	
 
 	}
 
