@@ -1,56 +1,44 @@
 package main
 
 import (
-	"bytes"
+	"flag"
 	"fmt"
+	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
 	"golang.org/x/net/context"
-	"github.com/4180122/distbayes/bclass"
-	"log"
+	"io/ioutil"
 	"math"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
-	"flag"
 )
 
 var (
-	ln    	 	*net.TCPListener
-	naddr  	 	map[int]string
-	logger 		*govec.GoLog
-	nID    		uint64
-	cnum      	int = 0
-	maxnode   	int = 0
-	myaddr    	*net.TCPAddr
-	cnumhist  	map[int]int
-	client    	map[string]int
-	claddr    	map[int]*net.TCPAddr
-	tempmodel 	map[int]aggregate
-	testqueue 	map[int]map[int]bool
-	models    	map[int]bclass.Model
-	modelC    	map[int]int
-	modelD   	int
-	channel   	chan message
-	l         	*net.TCPListener
-	gmodel    	bclass.GlobalModel
-	gempty    	bclass.GlobalModel
-	sID			string
+	naddr   map[int]string
+	logger  *govec.GoLog
+	nID     int
+	maxnode int = 0
+	myaddr  *net.TCPAddr
+	models  map[int]bclass.Model
+	modelC  map[int]int
+	modelD  int
+	channel chan message
+	gmodel  bclass.GlobalModel
+	gempty  bclass.GlobalModel
+	mynode  *node
 )
 
 const hb = 1
 
-// clean this up maybe?
-type Message struct {
-	Msg raftpb.Message
-}
 type aggregate struct {
-	cnum  int
-	model bclass.Model
-	c     int
-	d     int
+	Cnum  int
+	Model bclass.Model
+	C     int
+	D     int
 }
 
 type message struct {
@@ -62,15 +50,31 @@ type message struct {
 	Model  bclass.Model
 	GModel bclass.GlobalModel
 }
+
 type node struct {
-	id     uint64
-	ctx    context.Context
-	pstore map[string]string
-	store  *raft.MemoryStorage
-	cfg    *raft.Config
-	raft   raft.Node
-	ticker <-chan time.Time
-	done   <-chan struct{}
+	id        uint64
+	ctx       context.Context
+	store     *raft.MemoryStorage
+	cfg       *raft.Config
+	raft      raft.Node
+	cnum      int
+	cnumhist  map[int]int
+	client    map[string]int
+	tempmodel map[int]aggregate
+	testqueue map[int]map[int]bool
+	claddr    map[int]*net.TCPAddr
+	cstate    state
+	ticker    <-chan time.Time
+	done      <-chan struct{}
+}
+
+type state struct {
+	Cnum      int
+	Cnumhist  map[int]int
+	Client    map[string]int
+	Tempmodel map[int]aggregate
+	Testqueue map[int]map[int]bool
+	Claddr    map[int]string
 }
 
 func newNode(id uint64, peers []raft.Peer) *node {
@@ -81,15 +85,20 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		store: store,
 		cfg: &raft.Config{
 			ID:              id,
-			ElectionTick:    5 * hb,
+			ElectionTick:    20 * hb,
 			HeartbeatTick:   hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
-			MaxInflightMsgs: 256,
+			MaxInflightMsgs: 1024,
 		},
-		pstore: make(map[string]string),
-		ticker: time.Tick(time.Second),
-		done:   make(chan struct{}),
+		cnum:      0,
+		client:    make(map[string]int),
+		claddr:    make(map[int]*net.TCPAddr),
+		tempmodel: make(map[int]aggregate),
+		testqueue: make(map[int]map[int]bool),
+		cnumhist:  make(map[int]int),
+		ticker:    time.Tick(time.Second / 10),
+		done:      make(chan struct{}),
 	}
 
 	n.raft = raft.StartNode(n.cfg, peers)
@@ -124,11 +133,9 @@ func (n *node) run() {
 
 func (n *node) saveToStorage(hardState raftpb.HardState, entries []raftpb.Entry, snapshot raftpb.Snapshot) {
 	n.store.Append(entries)
-
 	if !raft.IsEmptyHardState(hardState) {
 		n.store.SetHardState(hardState)
 	}
-
 	if !raft.IsEmptySnap(snapshot) {
 		n.store.ApplySnapshot(snapshot)
 	}
@@ -136,14 +143,11 @@ func (n *node) saveToStorage(hardState raftpb.HardState, entries []raftpb.Entry,
 
 func (n *node) send(messages []raftpb.Message) {
 	for _, m := range messages {
-		//log.Println(raft.DescribeMessage(m, nil))
-		msg := Message{m}
-		outBuf := logger.PrepareSend("Sending message to other node", msg)
+		outBuf := logger.PrepareSend("Sending message to other node", m)
 		conn, err := net.Dial("tcp", naddr[int(m.To)])
 		if err == nil {
 			conn.Write(outBuf)
 		}
-		// send message to other node
 	}
 }
 
@@ -151,106 +155,116 @@ func (n *node) processSnapshot(snapshot raftpb.Snapshot) {
 	panic(fmt.Sprintf("Applying snapshot on node %v is not implemented", n.id))
 }
 
+//process idempotent modifications to the key-value stores
 func (n *node) process(entry raftpb.Entry) {
-	log.Printf("node %v: processing entry: %v\n", n.id, entry)
 	if entry.Type == raftpb.EntryNormal && entry.Data != nil {
-		parts := bytes.SplitN(entry.Data, []byte(":"), 2)
-		n.pstore[string(parts[0])] = string(parts[1])
+		var repstate state
+		logger.UnpackReceive("got propose", entry.Data, &repstate)
+		if repstate.Cnum > mynode.cnum {
+			mynode.cnum = repstate.Cnum
+		}
+		for k, v := range repstate.Cnumhist {
+			mynode.cnumhist[k] = v
+		}
+		for k, v := range repstate.Client {
+			mynode.client[k] = v
+		}
+		for k, v := range repstate.Tempmodel {
+			mynode.tempmodel[k] = v
+		}
+		for k, v := range repstate.Claddr {
+			mynode.claddr[k], _ = net.ResolveTCPAddr("tcp", v)
+		}
+		for k, v := range repstate.Testqueue {
+			for k2, v2 := range v {
+				if queue, ok := mynode.testqueue[k]; !ok {
+					queue := make(map[int]bool)
+					queue[k2] = v2
+					mynode.testqueue[k] = queue
+				} else {
+					queue[k2] = v2
+				}
+			}
+		}
+		mynode.cstate = repstate
 	}
 }
 
 func (n *node) receive(conn *net.TCPConn) {
 	// Echo all incoming data.
-	var imsg Message
-	buf := make([]byte, 2048)
+	var imsg raftpb.Message
+	buf := make([]byte, 1048576)
 	conn.Read(buf)
 	logger.UnpackReceive("Received Message From Client", buf, &imsg)
 	conn.Close()
-	//leadern := n.raft.Status().Lead
-	//fmt.Println("leader: ", leadern)
-	n.raft.Step(n.ctx, imsg.Msg)
+	n.raft.Step(n.ctx, imsg)
 }
-
-var (
-	nodes = make(map[int]*node)
-)
 
 func main() {
 	//Parsing inputargs
 	parseArgs()
-	// C1:=make(chan 	*net.TCPListener)
-	// C2:=make(chan 	*net.TCPListener)
-	nID, _ = strconv.ParseUint(sID, 10, 64)
-	InID := int(nID)
 
-	naddr = make(map[int]string)
-	naddr[1] = "127.0.0.1:6001"
-	naddr[2] = "127.0.0.1:6002"
-	naddr[3] = "127.0.0.1:6003"
-	naddr[4] = "127.0.0.1:6004"
-	naddr[5] = "127.0.0.1:6005"
-
-	nodeaddr, _ := net.ResolveTCPAddr("tcp", naddr[InID])
-	ln, _ = net.ListenTCP("tcp", nodeaddr)
-	l, err := net.ListenTCP("tcp", myaddr)
+	raftaddr, _ := net.ResolveTCPAddr("tcp", naddr[nID])
+	sl, err := net.ListenTCP("tcp", raftaddr)
 	checkError(err)
-	fmt.Println(l)
-	// C1<-ln
-	// C2<-l
-	// start a small cluster
-	nodes[InID] = newNode(nID, []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
-	nodes[InID].raft.Campaign(nodes[InID].ctx)
-	go nodes[InID].run()
-	go printLeader(nodes[InID], InID)
+	cl, err := net.ListenTCP("tcp", myaddr)
+	checkError(err)
 
 	// Wait for proposed entry to be commited in cluster.
 	// Apperently when should add an uniq id to the message and wait until it is
 	// commited in the node.
-	//fmt.Printf("** Sleeping to visualize heartbeat between nodes **\n")
-	client = make(map[string]int)
-	claddr = make(map[int]*net.TCPAddr)
 	models = make(map[int]bclass.Model)
 	modelC = make(map[int]int)
 	modelD = 0
 	gmodel = bclass.GlobalModel{models, modelC, modelD}
-	tempmodel = make(map[int]aggregate)
-	testqueue = make(map[int]map[int]bool)
-	cnumhist = make(map[int]int)
 	channel = make(chan message)
 
+	// start a small cluster
+	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
+	if nID == 1 {
+		mynode.raft.Campaign(mynode.ctx)
+	}
+
+	go mynode.run()
+	go printLeader()
+
 	go updateGlobal(channel)
-	fmt.Println("my addre",myaddr)
+	fmt.Println("my addre", myaddr)
 
 	//Initialize TCP Connection and listener
 
 	fmt.Printf("Server initialized.\n")
 
+	go clientListener(cl)
+
 	for {
-
-			conn, _ := ln.AcceptTCP()
-			go nodes[InID].receive(conn)
-			connC, err := l.AcceptTCP()
-			checkError(err)
-			go connHandler(connC)	
-
+		conn, err := sl.AcceptTCP()
+		checkError(err)
+		go mynode.receive(conn)
 	}
 
 }
 
-func printLeader(n *node, id int) {
+func clientListener(listen *net.TCPListener) {
+	for {
+		connC, err := listen.AcceptTCP()
+		checkError(err)
+		go connHandler(connC)
+	}
+}
+
+//useless function!!
+func printLeader() {
 	for {
 		time.Sleep(2 * time.Second)
-		leadern := n.raft.Status().Lead
+		leadern := mynode.raft.Status().Lead
 		fmt.Println("leader: ", leadern)
-		if int(leadern) == id {
-			n.raft.Propose(n.ctx, []byte("foo:bar"))
-		} else {
-			for k, v := range n.pstore {
-				fmt.Printf("%v = %v \n", k, v)
-			}
-		}
+		fmt.Println(mynode.client)
+		//fmt.Println(mynode.pstore)
+		//fmt.Println("my pstore: ", mynode.pstore)
 	}
 }
+
 func connHandler(conn *net.TCPConn) {
 	var msg message
 	p := make([]byte, 1048576)
@@ -259,15 +273,13 @@ func connHandler(conn *net.TCPConn) {
 	switch msg.Type {
 	case "commit_request":
 		//node is sending a model, must forward to others for testing
-		flag := checkQueue(client[msg.Name])
+		flag := checkQueue(mynode.client[msg.Name])
 		fmt.Printf("<-- Received commit request from %v.\n", msg.Name)
 		if flag {
-			conn.Write([]byte("OK"))
-			conn.Close()
-			processTestRequest(msg)
+			processTestRequest(msg, conn)
 		} else {
 			//denied
-			conn.Write([]byte("Pending tests are not complete."))
+			conn.Write([]byte("Pending tests are not complete"))
 			fmt.Printf("--> Denied commit request from %v.\n", msg.Name)
 			conn.Close()
 		}
@@ -279,15 +291,29 @@ func connHandler(conn *net.TCPConn) {
 		conn.Close()
 	case "test_complete":
 		//node is submitting test results, will update its queue
-		conn.Write([]byte("OK"))
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.Name)
-		testqueue[client[msg.Name]][cnumhist[msg.Id]] = false
+		mynode.testqueue[mynode.client[msg.Name]][mynode.cnumhist[msg.Id]] = false
+
+		//replication
+		temptestqueue := make(map[int]map[int]bool)
+		queue := make(map[int]bool)
+		queue[mynode.cnumhist[msg.Id]] = false
+		temptestqueue[mynode.client[msg.Name]] = queue
+		repstate := state{0, nil, nil, nil, temptestqueue, nil}
+		flag := replicate(repstate)
+
+		if flag {
+			conn.Write([]byte("OK"))
+			//update the pending commit and merge if complete
+			channel <- msg
+		} else {
+			conn.Write([]byte("Try again"))
+			fmt.Printf("--> Could not process test from %v.\n", msg.Name)
+		}
 		conn.Close()
-		//update the pending commit and merge if complete
-		channel <- msg
 	default:
 		conn.Write([]byte("OK"))
-		processJoin(msg)
+		processJoin(msg, conn)
 		conn.Close()
 	}
 }
@@ -296,50 +322,108 @@ func updateGlobal(ch chan message) {
 	// Function that aggregates the global model and commits when ready
 	for {
 		m := <-ch
-		id := cnumhist[m.Id]
-		tempAggregate := tempmodel[id]
-		tempAggregate.c += m.C
-		tempAggregate.d += m.D
-		tempmodel[id] = tempAggregate
-		if modelD < tempAggregate.d {
-			modelD = tempAggregate.d
+		id := mynode.cnumhist[m.Id]
+		tempAggregate := mynode.tempmodel[id]
+		tempAggregate.C += m.C
+		tempAggregate.D += m.D
+		mynode.tempmodel[id] = tempAggregate
+		if modelD < tempAggregate.D {
+			modelD = tempAggregate.D
 		}
-		if float64(tempAggregate.d) > float64(modelD)*0.6 {
-			models[id] = tempAggregate.model
-			modelC[id] = tempAggregate.c
+
+		//replicate
+		temptempmodel := make(map[int]aggregate)
+		temptempmodel[id] = tempAggregate
+		repstate := state{0, nil, nil, temptempmodel, nil, nil}
+		replicate(repstate)
+
+		if float64(tempAggregate.D) > float64(modelD)*0.6 {
+			models[id] = tempAggregate.Model
+			modelC[id] = tempAggregate.C
 			gmodel = bclass.GlobalModel{models, modelC, modelD}
 			logger.LogLocalEvent("commit_complete")
-			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
+			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.Cnum)
 		}
 	}
 }
 
-func processTestRequest(m message) {
-	cnum++
+func replicate(m state) bool {
+	flag := false
+	buf := logger.PrepareSend("packing to servers", m)
+	err := mynode.raft.Propose(mynode.ctx, buf)
+
+	//keep checking the status of the proposal for 2 seconds then let client know
+	//for !flag {
+	//	time.Sleep(1000 * time.Millisecond)
+	//	if reflect.DeepEqual(mynode.cstate, m) {
+	//		flag = true
+	//	}
+	//	fmt.Println(flag, mynode.cstate, m)
+	//}
+	if err == nil {
+		flag = true
+	}
+
+	return flag
+}
+
+func processTestRequest(m message, conn *net.TCPConn) {
+
+	//replicate variables
+	temptempmodel := make(map[int]aggregate)
+	tempcnumhist := make(map[int]int)
+	temptestqueue := make(map[int]map[int]bool)
+
+	mynode.cnum++
+	//update replicate cnum
+	tempcnum := mynode.cnum
+
 	//initialize new aggregate
-	tempmodel[client[m.Name]] = aggregate{cnum, m.Model, m.C, m.D}
-	cnumhist[cnum] = client[m.Name]
-	for name, id := range client {
-		if id != client[m.Name] {
-			sendTestRequest(name, id, cnum, m.Model)
+	mynode.tempmodel[mynode.client[m.Name]] = aggregate{mynode.cnum, m.Model, m.C, m.D}
+	mynode.cnumhist[mynode.cnum] = mynode.client[m.Name]
+	//update temp tempmodel and cnumhist
+	tempcnumhist[mynode.cnum] = mynode.client[m.Name]
+	temptempmodel[mynode.client[m.Name]] = aggregate{mynode.cnum, m.Model, m.C, m.D}
+
+	for _, id := range mynode.client {
+		if id != mynode.client[m.Name] {
+			//increment tests in queue for that node
+			if queue, ok := mynode.testqueue[id]; !ok {
+				queue := make(map[int]bool)
+				queue[mynode.cnumhist[tempcnum]] = true
+				mynode.testqueue[id] = queue
+				//update replicate queue
+				temptestqueue[id] = queue
+			} else {
+				queue[mynode.cnumhist[tempcnum]] = true
+			}
 		}
+	}
+
+	repstate := state{tempcnum, tempcnumhist, nil, temptempmodel, temptestqueue, nil}
+	flag := replicate(repstate)
+
+	if flag {
+		conn.Write([]byte("OK"))
+		conn.Close()
+		for name, id := range mynode.client {
+			if id != mynode.client[m.Name] {
+				sendTestRequest(name, id, mynode.cnum, m.Model)
+			}
+		}
+	} else {
+		conn.Write([]byte("Try again"))
+		conn.Close()
+		fmt.Printf("--> Denied commit request from %v.\n", m.Name)
 	}
 }
 
 func sendTestRequest(name string, id, tcnum int, tmodel bclass.Model) {
 	//create test request
 	msg := message{tcnum, "server", "test_request", 0, 0, tmodel, gempty}
-	//increment tests in queue for that node
-	if queue, ok := testqueue[id]; !ok {
-		queue := make(map[int]bool)
-		queue[cnumhist[tcnum]] = true
-		testqueue[id] = queue
-	} else {
-		queue[cnumhist[tcnum]] = true
-	}
 	//send the request
-	fmt.Printf("--> Sending test request from %v to %v.", cnumhist[tcnum], name)
-	err := tcpSend(claddr[id], msg)
+	fmt.Printf("--> Sending test request from %v to %v.", mynode.cnumhist[tcnum], name)
+	err := tcpSend(mynode.claddr[id], msg)
 	if err != nil {
 		fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
 	}
@@ -348,7 +432,7 @@ func sendTestRequest(name string, id, tcnum int, tmodel bclass.Model) {
 func sendGlobal(m message) {
 	fmt.Printf("--> Sending global model to %v.", m.Name)
 	msg := message{m.Id, "server", "global_grant", 0, 0, m.Model, gmodel}
-	tcpSend(claddr[client[m.Name]], msg)
+	tcpSend(mynode.claddr[mynode.client[m.Name]], msg)
 }
 
 func tcpSend(addr *net.TCPAddr, msg message) error {
@@ -371,7 +455,7 @@ func tcpSend(addr *net.TCPAddr, msg message) error {
 
 func checkQueue(id int) bool {
 	flag := true
-	for _, v := range testqueue[id] {
+	for _, v := range mynode.testqueue[id] {
 		if flag && v {
 			flag = false
 		}
@@ -379,33 +463,43 @@ func checkQueue(id int) bool {
 	return flag
 }
 
-func processJoin(m message) {
+func processJoin(m message, conn *net.TCPConn) {
 	//process depending on if it is a new node or a returning one
-	if _, ok := client[m.Name]; !ok {
+	if _, ok := mynode.client[m.Name]; !ok {
 		//adding a node that has never been added before
 		id := maxnode
 		maxnode++
-		client[m.Name] = id
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+		mynode.client[m.Name] = id
+		mynode.claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+
+		//replication
+		tempaddr := make(map[int]string)
+		tempclient := make(map[string]int)
+		tempclient[m.Name] = id
+		tempaddr[id] = m.Type
+		repstate := state{0, nil, tempclient, nil, nil, tempaddr}
+		replicate(repstate)
+
 		fmt.Printf("--- Added %v as node%v.\n", m.Name, id)
-		for _, v := range tempmodel {
-			sendTestRequest(m.Name, id, v.cnum, v.model)
+		for _, v := range mynode.tempmodel {
+			sendTestRequest(m.Name, id, v.Cnum, v.Model)
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
-		id := client[m.Name]
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+		id := mynode.client[m.Name]
+		mynode.claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
 		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
-		for k, v := range testqueue[id] {
+		for k, v := range mynode.testqueue[id] {
 			if v {
-				aggregate := tempmodel[k]
-				sendTestRequest(m.Name, id, aggregate.cnum, aggregate.model)
+				aggregate := mynode.tempmodel[k]
+				sendTestRequest(m.Name, id, aggregate.Cnum, aggregate.Model)
 			}
 		}
 	}
 }
 
 func parseArgs() {
+	naddr = make(map[int]string)
 	flag.Parse()
 	inputargs := flag.Args()
 	var err error
@@ -415,21 +509,20 @@ func parseArgs() {
 	}
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[0])
 	checkError(err)
-	sID=inputargs[1]
-	logger = govec.Initialize(inputargs[2], inputargs[2])
+	getNodeAddr(inputargs[1])
+	temp, _ := strconv.ParseInt(inputargs[2], 10, 64)
+	nID = int(temp)
+	logger = govec.Initialize(inputargs[3], inputargs[3])
 }
 
-//func getNodeAddr(slavefile string) {
-//	dat, err := ioutil.ReadFile(slavefile)
-//	checkError(err)
-//	nodestr := strings.Split(string(dat), "\n")
-//	for i := 0; i < len(nodestr)-1; i++ {
-//		nodeaddr := strings.Split(nodestr[i], " ")
-//		client[nodeaddr[0]] = i
-//		claddr[i], _ = net.ResolveTCPAddr("tcp", nodeaddr[1])
-//		//testqueue[i] = 0
-//	}
-//}
+func getNodeAddr(slavefile string) {
+	dat, err := ioutil.ReadFile(slavefile)
+	checkError(err)
+	nodestr := strings.Split(string(dat), " ")
+	for i := 0; i < len(nodestr)-1; i++ {
+		naddr[i+1] = nodestr[i]
+	}
+}
 
 func checkError(err error) {
 	if err != nil {
