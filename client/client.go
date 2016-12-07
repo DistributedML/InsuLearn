@@ -99,7 +99,7 @@ func parseUserInput() {
 	fmt.Print("Enter command: ")
 	text, _ := reader.ReadString('\n')
 	//Windows adds its own strange carriage return, the following lines fix it
-	if text[len(text)-1] == '\n' {
+	if text[len(text)-2] == '\r' {
 		ident = text[0 : len(text)-2]
 	} else {
 		ident = text[0 : len(text)-1]

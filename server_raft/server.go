@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"math"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -17,11 +18,12 @@ import (
 	"time"
 )
 
+const hb = 1
+
 var (
 	naddr   map[int]string
 	logger  *govec.GoLog
 	nID     int
-	maxnode int = 0
 	myaddr  *net.TCPAddr
 	models  map[int]bclass.Model
 	modelC  map[int]int
@@ -32,7 +34,35 @@ var (
 	mynode  *node
 )
 
-const hb = 1
+type node struct {
+	id        uint64
+	ctx       context.Context
+	store     *raft.MemoryStorage
+	cfg       *raft.Config
+	raft      raft.Node
+	propID    int
+	maxnode   int
+	cnum      int
+	cnumhist  map[int]int
+	client    map[string]int
+	tempmodel map[int]aggregate
+	testqueue map[int]map[int]bool
+	claddr    map[int]*net.TCPAddr
+	ticker    <-chan time.Time
+	done      <-chan struct{}
+}
+
+type state struct {
+	PropID    int
+	Maxnode   int
+	Cnum      int
+	Cnumhist  map[int]int
+	Client    map[string]int
+	Tempmodel map[int]aggregate
+	Testqueue map[int]map[int]bool
+	Claddr    map[int]string
+	Msg       message
+}
 
 type aggregate struct {
 	Cnum  int
@@ -51,32 +81,6 @@ type message struct {
 	GModel bclass.GlobalModel
 }
 
-type node struct {
-	id        uint64
-	ctx       context.Context
-	store     *raft.MemoryStorage
-	cfg       *raft.Config
-	raft      raft.Node
-	cnum      int
-	cnumhist  map[int]int
-	client    map[string]int
-	tempmodel map[int]aggregate
-	testqueue map[int]map[int]bool
-	claddr    map[int]*net.TCPAddr
-	cstate    state
-	ticker    <-chan time.Time
-	done      <-chan struct{}
-}
-
-type state struct {
-	Cnum      int
-	Cnumhist  map[int]int
-	Client    map[string]int
-	Tempmodel map[int]aggregate
-	Testqueue map[int]map[int]bool
-	Claddr    map[int]string
-}
-
 func newNode(id uint64, peers []raft.Peer) *node {
 	store := raft.NewMemoryStorage()
 	n := &node{
@@ -86,11 +90,13 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		cfg: &raft.Config{
 			ID:              id,
 			ElectionTick:    20 * hb,
-			HeartbeatTick:   hb,
+			HeartbeatTick:   4 * hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
 		},
+		propID:    0,
+		maxnode:   0,
 		cnum:      0,
 		client:    make(map[string]int),
 		claddr:    make(map[int]*net.TCPAddr),
@@ -160,20 +166,28 @@ func (n *node) process(entry raftpb.Entry) {
 	if entry.Type == raftpb.EntryNormal && entry.Data != nil {
 		var repstate state
 		logger.UnpackReceive("got propose", entry.Data, &repstate)
+		mynode.propID = repstate.PropID
 		if repstate.Cnum > mynode.cnum {
 			mynode.cnum = repstate.Cnum
 		}
+		if repstate.Maxnode > mynode.maxnode {
+			mynode.maxnode = repstate.Maxnode
+		}
 		for k, v := range repstate.Cnumhist {
 			mynode.cnumhist[k] = v
+			//fmt.Println("Committed c_hist:", mynode.cnumhist)
 		}
 		for k, v := range repstate.Client {
 			mynode.client[k] = v
+			fmt.Println("Committed client:", mynode.client)
 		}
 		for k, v := range repstate.Tempmodel {
 			mynode.tempmodel[k] = v
+			//fmt.Println("Committed tempmodel:", mynode.tempmodel)
 		}
 		for k, v := range repstate.Claddr {
 			mynode.claddr[k], _ = net.ResolveTCPAddr("tcp", v)
+			//fmt.Println("Committed client address:", mynode.claddr)
 		}
 		for k, v := range repstate.Testqueue {
 			for k2, v2 := range v {
@@ -185,8 +199,14 @@ func (n *node) process(entry raftpb.Entry) {
 					queue[k2] = v2
 				}
 			}
+			//fmt.Println("Committed testqueue:", mynode.testqueue)
 		}
-		mynode.cstate = repstate
+		if repstate.Msg.Type != "" {
+			//fmt.Println("message :", repstate.Msg)
+			channel <- repstate.Msg
+			//time.Sleep(time.Second * 2)
+			//fmt.Println("Committed gmodel:", gmodel)
+		}
 	}
 }
 
@@ -226,13 +246,11 @@ func main() {
 	}
 
 	go mynode.run()
-	go printLeader()
+	//go printLeader()
 
 	go updateGlobal(channel)
-	fmt.Println("my addre", myaddr)
 
 	//Initialize TCP Connection and listener
-
 	fmt.Printf("Server initialized.\n")
 
 	go clientListener(cl)
@@ -250,18 +268,6 @@ func clientListener(listen *net.TCPListener) {
 		connC, err := listen.AcceptTCP()
 		checkError(err)
 		go connHandler(connC)
-	}
-}
-
-//useless function!!
-func printLeader() {
-	for {
-		time.Sleep(2 * time.Second)
-		leadern := mynode.raft.Status().Lead
-		fmt.Println("leader: ", leadern)
-		fmt.Println(mynode.client)
-		//fmt.Println(mynode.pstore)
-		//fmt.Println("my pstore: ", mynode.pstore)
 	}
 }
 
@@ -292,20 +298,17 @@ func connHandler(conn *net.TCPConn) {
 	case "test_complete":
 		//node is submitting test results, will update its queue
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.Name)
-		mynode.testqueue[mynode.client[msg.Name]][mynode.cnumhist[msg.Id]] = false
 
 		//replication
 		temptestqueue := make(map[int]map[int]bool)
 		queue := make(map[int]bool)
 		queue[mynode.cnumhist[msg.Id]] = false
 		temptestqueue[mynode.client[msg.Name]] = queue
-		repstate := state{0, nil, nil, nil, temptestqueue, nil}
+		repstate := state{0, 0, 0, nil, nil, nil, temptestqueue, nil, msg}
 		flag := replicate(repstate)
 
 		if flag {
 			conn.Write([]byte("OK"))
-			//update the pending commit and merge if complete
-			channel <- msg
 		} else {
 			conn.Write([]byte("Try again"))
 			fmt.Printf("--> Could not process test from %v.\n", msg.Name)
@@ -331,12 +334,7 @@ func updateGlobal(ch chan message) {
 			modelD = tempAggregate.D
 		}
 
-		//replicate
-		temptempmodel := make(map[int]aggregate)
-		temptempmodel[id] = tempAggregate
-		repstate := state{0, nil, nil, temptempmodel, nil, nil}
-		replicate(repstate)
-
+		//TODO replicate globalmodel
 		if float64(tempAggregate.D) > float64(modelD)*0.6 {
 			models[id] = tempAggregate.Model
 			modelC[id] = tempAggregate.C
@@ -349,19 +347,19 @@ func updateGlobal(ch chan message) {
 
 func replicate(m state) bool {
 	flag := false
+
+	r := rand.Intn(999999999999)
+	m.PropID = r
 	buf := logger.PrepareSend("packing to servers", m)
 	err := mynode.raft.Propose(mynode.ctx, buf)
 
-	//keep checking the status of the proposal for 2 seconds then let client know
-	//for !flag {
-	//	time.Sleep(1000 * time.Millisecond)
-	//	if reflect.DeepEqual(mynode.cstate, m) {
-	//		flag = true
-	//	}
-	//	fmt.Println(flag, mynode.cstate, m)
-	//}
 	if err == nil {
+		//block and check the status of the proposal
+		//for !flag {
+		//	if mynode.propID == r {
 		flag = true
+		//	}
+		//}
 	}
 
 	return flag
@@ -374,34 +372,26 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	tempcnumhist := make(map[int]int)
 	temptestqueue := make(map[int]map[int]bool)
 
-	mynode.cnum++
 	//update replicate cnum
-	tempcnum := mynode.cnum
+	tempcnum := mynode.cnum + 1
 
-	//initialize new aggregate
-	mynode.tempmodel[mynode.client[m.Name]] = aggregate{mynode.cnum, m.Model, m.C, m.D}
-	mynode.cnumhist[mynode.cnum] = mynode.client[m.Name]
 	//update temp tempmodel and cnumhist
-	tempcnumhist[mynode.cnum] = mynode.client[m.Name]
-	temptempmodel[mynode.client[m.Name]] = aggregate{mynode.cnum, m.Model, m.C, m.D}
+	tempcnumhist[tempcnum] = mynode.client[m.Name]
+	temptempmodel[mynode.client[m.Name]] = aggregate{tempcnum, m.Model, m.C, m.D}
 
+	//update replicate queue
 	for _, id := range mynode.client {
 		if id != mynode.client[m.Name] {
-			//increment tests in queue for that node
-			if queue, ok := mynode.testqueue[id]; !ok {
-				queue := make(map[int]bool)
-				queue[mynode.cnumhist[tempcnum]] = true
-				mynode.testqueue[id] = queue
-				//update replicate queue
-				temptestqueue[id] = queue
-			} else {
-				queue[mynode.cnumhist[tempcnum]] = true
-			}
+			queue := make(map[int]bool)
+			queue[tempcnumhist[tempcnum]] = true
+			temptestqueue[id] = queue
 		}
 	}
 
-	repstate := state{tempcnum, tempcnumhist, nil, temptempmodel, temptestqueue, nil}
+	tempmsg := message{}
+	repstate := state{0, 0, tempcnum, tempcnumhist, nil, temptempmodel, temptestqueue, nil, tempmsg}
 	flag := replicate(repstate)
+	time.Sleep(time.Second * 2)
 
 	if flag {
 		conn.Write([]byte("OK"))
@@ -465,19 +455,19 @@ func checkQueue(id int) bool {
 
 func processJoin(m message, conn *net.TCPConn) {
 	//process depending on if it is a new node or a returning one
+	tempaddr := make(map[int]string)
+	tempclient := make(map[string]int)
+
 	if _, ok := mynode.client[m.Name]; !ok {
 		//adding a node that has never been added before
-		id := maxnode
-		maxnode++
-		mynode.client[m.Name] = id
-		mynode.claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+		id := mynode.maxnode
+		tempmaxnode := mynode.maxnode + 1
 
 		//replication
-		tempaddr := make(map[int]string)
-		tempclient := make(map[string]int)
 		tempclient[m.Name] = id
 		tempaddr[id] = m.Type
-		repstate := state{0, nil, tempclient, nil, nil, tempaddr}
+		tempmsg := message{}
+		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
 		replicate(repstate)
 
 		fmt.Printf("--- Added %v as node%v.\n", m.Name, id)
@@ -487,7 +477,13 @@ func processJoin(m message, conn *net.TCPConn) {
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
 		id := mynode.client[m.Name]
-		mynode.claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+
+		//replication
+		tempaddr[id] = m.Type
+		tempmsg := message{}
+		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
+		replicate(repstate)
+
 		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
 		for k, v := range mynode.testqueue[id] {
 			if v {
