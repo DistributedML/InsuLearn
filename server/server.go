@@ -37,6 +37,7 @@ type aggregate struct {
 
 type message struct {
 	Id     int
+	Ip     string
 	Name   string
 	Type   string
 	C      int
@@ -109,10 +110,13 @@ func connHandler(conn *net.TCPConn) {
 		conn.Close()
 		//update the pending commit and merge if complete
 		channel <- msg
-	default:
+	case "join_request":
 		conn.Write([]byte("OK"))
 		processJoin(msg)
 		conn.Close()
+	default:
+		fmt.Println("something weird happened!")
+		fmt.Println(msg)
 	}
 }
 
@@ -152,7 +156,7 @@ func processTestRequest(m message) {
 
 func sendTestRequest(name string, id, tcnum int, tmodel bclass.Model) {
 	//create test request
-	msg := message{tcnum, "server", "test_request", 0, 0, tmodel, gempty}
+	msg := message{tcnum, myaddr.String(), "server", "test_request", 0, 0, tmodel, gempty}
 	//increment tests in queue for that node
 	if queue, ok := testqueue[id]; !ok {
 		queue := make(map[int]bool)
@@ -171,7 +175,7 @@ func sendTestRequest(name string, id, tcnum int, tmodel bclass.Model) {
 
 func sendGlobal(m message) {
 	fmt.Printf("--> Sending global model to %v.", m.Name)
-	msg := message{m.Id, "server", "global_grant", 0, 0, m.Model, gmodel}
+	msg := message{m.Id, myaddr.String(), "server", "global_grant", 0, 0, m.Model, gmodel}
 	tcpSend(claddr[client[m.Name]], msg)
 }
 
@@ -210,7 +214,7 @@ func processJoin(m message) {
 		id := maxnode
 		maxnode++
 		client[m.Name] = id
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
 		fmt.Printf("--- Added %v as node%v.\n", m.Name, id)
 		for _, v := range tempmodel {
 			sendTestRequest(m.Name, id, v.cnum, v.model)
@@ -218,7 +222,7 @@ func processJoin(m message) {
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
 		id := client[m.Name]
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Type)
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
 		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
 		for k, v := range testqueue[id] {
 			if v {

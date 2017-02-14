@@ -2,7 +2,6 @@ package distmlMatlab
 
 import (
 	//"fmt"
-	"sort"
 	"unsafe"
 )
 
@@ -36,11 +35,6 @@ type MatModel struct {
 
 type MatGlobalModel struct {
 	Params []float64
-}
-
-type Slice struct {
-	sort.IntSlice
-	idx []int
 }
 
 func NewModel(x, y string) MatModel {
@@ -154,17 +148,4 @@ func doubleToFloats(in *C.double, size int) []float64 {
 	//defer C.free(unsafe.Pointer(in))
 	out := (*[1 << 30]float64)(unsafe.Pointer(in))[:size:size]
 	return out
-}
-
-func (s Slice) Swap(i, j int) {
-	s.IntSlice.Swap(i, j)
-	s.idx[i], s.idx[j] = s.idx[j], s.idx[i]
-}
-
-func NewSlice(n ...int) *Slice {
-	s := &Slice{IntSlice: sort.IntSlice(n), idx: make([]int, len(n))}
-	for i := range s.idx {
-		s.idx[i] = i
-	}
-	return s
 }
