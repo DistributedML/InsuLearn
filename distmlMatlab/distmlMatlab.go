@@ -110,6 +110,10 @@ func CompactGlobal(models map[int]MatModel, modelR map[int]map[int]float64, mode
 	return gmodel
 }
 
+func Hack() {
+	C.engOpen(nil)
+}
+
 func StartEngine() *C.Engine {
 	return C.engOpenSingleUse(nil, nil, nil)
 }

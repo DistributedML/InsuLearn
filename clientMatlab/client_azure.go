@@ -50,6 +50,11 @@ func main() {
 	//Parsing inputargs
 	parseArgs()
 
+	//Hacky solution to the Matlab problem (Mathworks, please fix this!)
+	// see: https://www.mathworks.com/matlabcentral/answers/305877-what-is-the-primary-message-table-for-module-77
+	// and  https://github.com/JuliaInterop/MATLAB.jl/issues/47
+	distmlMatlab.Hack()
+
 	//Initialize stuff
 	model = distmlMatlab.NewModel(X, Y)
 
