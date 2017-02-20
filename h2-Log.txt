@@ -1,0 +1,12 @@
+hospital2 {"hospital2":1}
+Initialization Complete
+hospital2 {"hospital2":2}
+join_request
+hospital2 {"hospital1":3, "hospital2":3, "s1":5}
+Received message
+hospital2 {"hospital1":3, "hospital2":4, "s1":5}
+test_complete
+hospital2 {"hospital1":3, "hospital2":5, "s1":5}
+global_request
+hospital2 {"hospital1":3, "hospital2":6, "s1":9}
+Received message

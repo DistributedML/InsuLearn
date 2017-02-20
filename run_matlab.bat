@@ -1,5 +1,5 @@
 rem echo off
-set PATH=C:\Program Files\Matlab\R2011b\bin\win64;C:\TDM-GCC-64\bin;%PATH%
+set PATH=C:\Program Files\Matlab\R2016a\bin\win64;C:\TDM-GCC-64\bin;%PATH%
 rem cd %GOPATH%
 go build -o clientbayes.exe .\clientMatlab\client.go
 go build -o serverbayes.exe .\serverMatlab\server.go

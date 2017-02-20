@@ -1,0 +1,18 @@
+s1 {"s1":1}
+Initialization Complete
+s1 {"hospital1":2, "s1":2}
+Received message
+s1 {"hospital1":2, "hospital2":2, "s1":3}
+Received message
+s1 {"hospital1":3, "hospital2":2, "s1":4}
+Received message
+s1 {"hospital1":3, "hospital2":2, "s1":5}
+test_request
+s1 {"hospital1":3, "hospital2":4, "s1":6}
+Received message
+s1 {"hospital1":3, "hospital2":4, "s1":7}
+commit_complete
+s1 {"hospital1":3, "hospital2":5, "s1":8}
+Received message
+s1 {"hospital1":3, "hospital2":5, "s1":9}
+global_grant
