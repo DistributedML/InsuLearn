@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/gob"
 	"flag"
 	"fmt"
@@ -93,8 +92,8 @@ func connHandler(conn *net.TCPConn) {
 	//p := make([]byte, BUFFSIZE)
 	//conn.Read(p)
 	//logger.UnpackReceive("Received message", p, &msg)
-	dec := gob.Decoder(conn)
-	err := de.Decode(&msg)
+	dec := gob.NewDecoder(conn)
+	err := dec.Decode(&msg)
 	checkError(err)
 	fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
 	switch msg.Type {
@@ -221,7 +220,7 @@ func tcpSend(addr *net.TCPAddr, msg message) error {
 	if err == nil {
 		//outbuf := logger.PrepareSend(msg.Type, msg)
 		//_, err = conn.Write(outbuf)
-		enc := gob.Encoder(conn)
+		enc := gob.NewEncoder(conn)
 		err := enc.Encode(msg)
 		checkError(err)
 		n, _ := conn.Read(p)

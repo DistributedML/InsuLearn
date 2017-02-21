@@ -94,8 +94,8 @@ func connHandler(conn *net.TCPConn) {
 	//p := make([]byte, BUFFSIZE)
 	//conn.Read(p)
 	//logger.UnpackReceive("Received message", p, &msg)
-	dec := gob.Decoder(conn)
-	err := de.Decode(&msg)
+	dec := gob.NewDecoder(conn)
+	err := dec.Decode(&msg)
 	checkError(err)
 	switch msg.Type {
 	case "test_request":
@@ -198,7 +198,7 @@ func tcpSend(msg message) {
 	checkError(err)
 	//outbuf := logger.PrepareSend(msg.Type, msg)
 	//_, err = conn.Write(outbuf)
-	enc := gob.Encoder(conn)
+	enc := gob.NewEncoder(conn)
 	err := enc.Encode(msg)
 	checkError(err)
 	n, _ := conn.Read(p)
