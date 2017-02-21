@@ -40,12 +40,17 @@ var (
 )
 
 type message struct {
-	Id     int
-	IpMe   string
-	NameMe string
-	Type   string
-	Model  distmlMatlab.MatModel
-	GModel distmlMatlab.MatGlobalModel
+	Id       int
+	NodeIp   string
+	NodeName string
+	Type     string
+	Model    distmlMatlab.MatModel
+	GModel   distmlMatlab.MatGlobalModel
+}
+
+type response struct {
+	Resp  string
+	Error string
 }
 
 func main() {
@@ -92,9 +97,6 @@ func listener() {
 
 func connHandler(conn *net.TCPConn) {
 	var msg message
-	//p := make([]byte, BUFFSIZE)
-	//conn.Read(p)
-	//logger.UnpackReceive("Received message", p, &msg)
 	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
 	err := dec.Decode(&msg)
@@ -102,20 +104,17 @@ func connHandler(conn *net.TCPConn) {
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
-		enc.Encode(message{0, "", "OK", "", model, gempty})
-		//conn.Write([]byte("OK"))
+		enc.Encode(response{"OK", ""})
 		go testModel(msg.Id, msg.Model)
 	case "global_grant":
 		// server is sending global model
-		enc.Encode(message{0, "", "OK", "", model, gempty})
-		//conn.Write([]byte("OK"))
+		enc.Encode(response{"OK", ""})
 		gmodel = msg.GModel
 		fmt.Printf("\n <-- Pulled global model from server.\nEnter command: ")
 		//go testGlobal(msg.GModel)
 	default:
 		// respond to ping
-		//conn.Write([]byte("Unknown command"))
-		enc.Encode(message{0, "", "Unknown command", "", model, gempty})
+		enc.Encode(response{"NO", "Unknown Command"})
 	}
 	conn.Close()
 }
@@ -198,19 +197,16 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 }
 
 func tcpSend(msg message) {
-	//p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, svaddr)
 	checkError(err)
-	//outbuf := logger.PrepareSend(msg.Type, msg)
-	//_, err = conn.Write(outbuf)
 	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
 	err = enc.Encode(&msg)
 	checkError(err)
-	var m message
-	err = dec.Decode(&m)
-	//n, _ := conn.Read(p)
-	if m.NameMe == "OK" {
+	var r response
+	err = dec.Decode(&r)
+	checkError(err)
+	if r.Resp == "OK" {
 		fmt.Printf(" [OK]\n")
 		if msg.Type == "commit_request" {
 			committed = true
@@ -218,17 +214,10 @@ func tcpSend(msg message) {
 		if msg.Type == "join_request" {
 			isjoining = false
 		}
-		//} else if string(p[:n]) == "OOPS!" {
-	} else if m.NameMe == "OOPS!" {
-		//fmt.Println(p[:n])
-		fmt.Println("OOPS!")
-		fmt.Println("Beofre: ", msg.NameMe, msg.IpMe, msg.Type)
-		//var msgwhat message
-		//logger.UnpackReceive("Received message", outbuf, &msgwhat)
-		//fmt.Println("After: ", msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
+	} else if r.Resp == "NO" {
+		fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
 	} else {
-		//fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
-		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", m.NameMe)
+		fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 	}
 }
 
