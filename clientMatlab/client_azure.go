@@ -35,6 +35,7 @@ var (
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
 	committed bool
+	isjoining bool
 )
 
 type message struct {
@@ -62,7 +63,11 @@ func main() {
 	l, _ = net.ListenTCP("tcp", myaddr)
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
-	requestJoin()
+
+	isjoining = true
+	for isjoining {
+		requestJoin()
+	}
 
 	committed = false
 
@@ -196,6 +201,9 @@ func tcpSend(msg message) {
 		fmt.Printf(" [OK]\n")
 		if msg.Type == "commit_request" {
 			committed = true
+		}
+		if msg.Type == "join_request" {
+			isjoining == false
 		}
 	} else if string(p[:n]) == "OOPS!" {
 		fmt.Println(p[:n])
