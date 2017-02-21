@@ -12,6 +12,7 @@ import (
 	"os"
 	//"strconv"
 	//"strings"
+	"time"
 )
 
 const BUFFSIZE = 200000
@@ -33,6 +34,7 @@ var (
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
+	committed bool
 )
 
 type message struct {
@@ -62,9 +64,15 @@ func main() {
 	go listener()
 	requestJoin()
 
+	committed = false
+
 	//Main function of this server
 	for {
-		parseUserInput()
+		//parseUserInput()
+		time.Sleep(time.Duration(1 * time.Second))
+		if !committed {
+			requestCommit()
+		}
 	}
 }
 
@@ -188,6 +196,9 @@ func tcpSend(msg message) {
 		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
 	} else {
 		fmt.Printf(" [OK]\n")
+		if msg.Type == "commit_request" {
+			committed = true
+		}
 	}
 }
 
