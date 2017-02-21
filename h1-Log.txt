@@ -1,6 +1,0 @@
-hospital1 {"hospital1":1}
-Initialization Complete
-hospital1 {"hospital1":2}
-join_request
-hospital1 {"hospital1":3}
-commit_request
