@@ -27,7 +27,7 @@ var (
 	modelC    map[int]float64
 	modelD    float64
 	channel   chan message
-	conchan   chan *net.TCPAddr
+	conchan   chan *net.TCPConn
 	logger    *govec.GoLog
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
@@ -90,8 +90,8 @@ func main() {
 
 }
 
-func connHandler(conn chan *net.TCPConn) {
-	conn := connMain
+func connHandler(ch chan *net.TCPConn) {
+	conn := <-ch
 	var msg message
 	p := make([]byte, BUFFSIZE)
 	conn.Read(p)
