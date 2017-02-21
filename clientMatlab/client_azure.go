@@ -199,10 +199,11 @@ func tcpSend(msg message) {
 		}
 	} else if string(p[:n]) == "OOPS!" {
 		fmt.Println(p[:n])
-		fmt.Println(msg.NameMe, msg.IpMe, msg.Type)
+		fmt.Println("OOPS!")
+		fmt.Println("Beofre: ", msg.NameMe, msg.IpMe, msg.Type)
 		var msgwhat message
-		logger.UnpackReceive("Received message", p, &msgwhat)
-		fmt.Println(msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
+		logger.UnpackReceive("Received message", outbuf, &msgwhat)
+		fmt.Println("After: ", msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
 	} else {
 		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
 	}
