@@ -30,7 +30,7 @@ var (
 	modelD  float64
 	channel chan message
 	gempty  distmlMatlab.MatGlobalModel
-	gmodel  distmlMatlab.GMatGlobalModel
+	gmodel  distmlMatlab.MatGlobalModel
 	mynode  *node
 )
 type node struct {
@@ -315,23 +315,26 @@ func updateGlobal(ch chan message) {
 	// Function that aggregates the global model and commits when ready
 	for {
 		m := <-ch
-		id := cnumhist[m.Id]
-		tempAggregate := tempmodel[id]
-		tempAggregate.d += m.Model.Size
-		tempAggregate.r[client[m.Name]] = m.Model.Weight
-		tempmodel[id] = tempAggregate
+		id := mynode.cnumhist[m.Id]
+		tempAggregate := mynode.tempmodel[id]
+		tempAggregate.d += mynode.m.Model.Size
+		tempAggregate.r[client[m.Name]] += mynode.m.Model.Weight
+		mynode.tempmodel[id] = tempAggregate
 		if modelD < tempAggregate.d {
 			modelD = tempAggregate.d
 		}
+
+		//TODO replicate globalmodel
 		if float64(tempAggregate.d) > float64(modelD)*0.6 {
-			models[id] = tempAggregate.model
-			modelR[id] = tempAggregate.r
+			models[id] = tempAggregate.Model
+			modelC[id] = tempAggregate.r
 			modelC[id] = tempAggregate.c
 			logger.LogLocalEvent("commit_complete")
-			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
+			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.Cnum)
 		}
 	}
 }
+
 func replicate(m state) bool {
 	flag := false
 

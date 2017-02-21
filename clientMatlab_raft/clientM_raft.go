@@ -1,19 +1,19 @@
 package main
 
-import{
+import(
 	"bufio"
 	"flag"
 	"fmt"
 	"github.com/4180122/distbayes/distmlMatlab"
 	"github.com/arcaneiceman/GoVector/govec"
 	//"github.com/gonum/matrix/mat64"
-	//"io/ioutil"
+	"io/ioutil"
 	"net"
 	"os"
-	"strconv"
+	//"strconv"
 	"strings"
 	
-}
+)
 const BUFFSIZE = 200000
 
 //10485760
@@ -175,7 +175,14 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 }
 func tcpSend(msg message) {
 	p := make([]byte, BUFFSIZE)
-	conn, err := net.DialTCP("tcp", nil, svaddr)
+	var err error
+	var conn *net.TCPConn
+	for _, v := range svaddr {
+		conn, err = net.DialTCP("tcp", nil, v)
+		if err == nil {
+			break
+		}
+	}
 	checkError(err)
 	outbuf := logger.PrepareSend(msg.Type, msg)
 	_, err = conn.Write(outbuf)
