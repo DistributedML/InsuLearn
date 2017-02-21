@@ -86,7 +86,8 @@ func main() {
 
 }
 
-func connHandler(conn *net.TCPConn) {
+func connHandler(connMain *net.TCPConn) {
+	conn := connMain
 	var msg message
 	p := make([]byte, BUFFSIZE)
 	conn.Read(p)
