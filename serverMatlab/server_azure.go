@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-const BUFFSIZE = 200000
+const BUFFSIZE = 400000
 
 //10485760
 
@@ -127,7 +127,7 @@ func connHandler(conn *net.TCPConn) {
 		conn.Close()
 	default:
 		fmt.Println("something weird happened!")
-		fmt.Println(msg)
+		fmt.Println(msg.IP, msg.Name, msg.Type)
 		conn.Write([]byte("NO!"))
 		conn.Close()
 	}
