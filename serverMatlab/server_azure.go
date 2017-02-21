@@ -128,7 +128,7 @@ func connHandler(conn *net.TCPConn) {
 	default:
 		fmt.Println("something weird happened!")
 		fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
-		conn.Write([]byte("NO!"))
+		conn.Write([]byte("OOPS!"))
 		conn.Close()
 	}
 
