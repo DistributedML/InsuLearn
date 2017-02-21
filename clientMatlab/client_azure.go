@@ -19,9 +19,7 @@ const BUFFSIZE = 200000
 //10485760
 
 var (
-	cnum      int     = 0
-	modeldeg  int     = 2
-	modellam  float64 = 0.01
+	cnum      int = 0
 	name      string
 	inputargs []string
 	myaddr    *net.TCPAddr
