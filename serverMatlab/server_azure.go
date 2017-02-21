@@ -27,6 +27,7 @@ var (
 	modelC    map[int]float64
 	modelD    float64
 	channel   chan message
+	conchan   chan *net.TCPAddr
 	logger    *govec.GoLog
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
@@ -63,8 +64,10 @@ func main() {
 	testqueue = make(map[int]map[int]bool)
 	cnumhist = make(map[int]int)
 	channel = make(chan message)
+	conchan = make(chan *net.TCPConn)
 
 	go updateGlobal(channel)
+	go connHandler(conchan)
 
 	//Parsing inputargs
 	parseArgs()
@@ -81,12 +84,13 @@ func main() {
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
-		go connHandler(conn)
+		conchan <- conn
+		//go connHandler(conn)
 	}
 
 }
 
-func connHandler(connMain *net.TCPConn) {
+func connHandler(conn chan *net.TCPConn) {
 	conn := connMain
 	var msg message
 	p := make([]byte, BUFFSIZE)
