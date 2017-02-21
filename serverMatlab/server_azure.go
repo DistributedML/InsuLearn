@@ -98,7 +98,6 @@ func connHandler(conn *net.TCPConn) {
 	enc := gob.NewEncoder(conn)
 	err := dec.Decode(&msg)
 	checkError(err)
-	fmt.Println(msg.NodeIp, msg.NodeName, msg.Type)
 	switch msg.Type {
 	case "commit_request":
 		//node is sending a model, must forward to others for testing
@@ -135,8 +134,8 @@ func connHandler(conn *net.TCPConn) {
 		conn.Close()
 	default:
 		fmt.Println("something weird happened!")
-		fmt.Println(msg.NodeIp, msg.NodeName, msg.Type)
-		enc.Encode(response{"OK", ""})
+		//fmt.Println(msg.NodeIp, msg.NodeName, msg.Type)
+		enc.Encode(response{"NO", "Unknown Request"})
 		conn.Close()
 	}
 
