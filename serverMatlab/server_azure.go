@@ -93,6 +93,7 @@ func connHandler(conn *net.TCPConn) {
 	//conn.Read(p)
 	//logger.UnpackReceive("Received message", p, &msg)
 	dec := gob.NewDecoder(conn)
+	enc := gob.NewEncoder(conn)
 	err := dec.Decode(&msg)
 	checkError(err)
 	fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
@@ -102,38 +103,44 @@ func connHandler(conn *net.TCPConn) {
 		flag := checkQueue(client[msg.NameMe])
 		fmt.Printf("<-- Received commit request from %v.\n", msg.NameMe)
 		if flag {
-			conn.Write([]byte("OK"))
+			enc.Encode(message{0, "", "OK", "", msg.Model, gempty})
+			//conn.Write([]byte("OK"))
 			conn.Close()
 			processTestRequest(msg)
 		} else {
 			//denied
-			conn.Write([]byte("Pending tests are not complete."))
+			enc.Encode(message{0, "", "Pending tests are not complete.", "", msg.Model, gempty})
+			//conn.Write([]byte("Pending tests are not complete."))
 			fmt.Printf("--> Denied commit request from %v.\n", msg.NameMe)
 			conn.Close()
 		}
 	case "global_request":
 		//node is requesting the global model, will forward
-		conn.Write([]byte("OK"))
+		enc.Encode(message{0, "", "OK", "", msg.Model, gempty})
+		//conn.Write([]byte("OK"))
 		fmt.Printf("<-- Received global model request from %v.\n", msg.NameMe)
 		genGlobalModel() //TODO maybe move this elsewhere
 		sendGlobal(msg)
 		conn.Close()
 	case "test_complete":
 		//node is submitting test results, will update its queue
-		conn.Write([]byte("OK"))
+		enc.Encode(message{0, "", "OK", "", msg.Model, gempty})
+		//conn.Write([]byte("OK"))
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.NameMe)
 		testqueue[client[msg.NameMe]][cnumhist[msg.Id]] = false
 		conn.Close()
 		//update the pending commit and merge if complete
 		channel <- msg
 	case "join_request":
-		conn.Write([]byte("OK"))
+		enc.Encode(message{0, "", "OK", "", msg.Model, gempty})
+		//conn.Write([]byte("OK"))
 		processJoin(msg)
 		conn.Close()
 	default:
 		fmt.Println("something weird happened!")
 		fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
-		conn.Write([]byte("OOPS!"))
+		enc.Encode(message{0, "", "OK", "", msg.Model, gempty})
+		//conn.Write([]byte("OOPS!"))
 		conn.Close()
 	}
 
@@ -214,18 +221,24 @@ func sendGlobal(m message) {
 }
 
 func tcpSend(addr *net.TCPAddr, msg message) error {
-	p := make([]byte, BUFFSIZE)
+	//p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, addr)
 	//checkError(err)
 	if err == nil {
 		//outbuf := logger.PrepareSend(msg.Type, msg)
 		//_, err = conn.Write(outbuf)
 		enc := gob.NewEncoder(conn)
+		dec := gob.NewDecoder(conn)
 		err := enc.Encode(msg)
 		checkError(err)
-		n, _ := conn.Read(p)
-		if string(p[:n]) != "OK" {
-			fmt.Printf(" [NO!]\n<-- Request was denied by node: %v.\nEnter command: ", string(p[:n]))
+		//n, _ := conn.Read(p)
+		var m message
+		err = dec.Decode(&m)
+		checkError(err)
+		//if string(p[:n]) != "OK" {
+		if m.NameMe != "OK" {
+			//fmt.Printf(" [NO!]\n<-- Request was denied by node: %v.\nEnter command: ", string(p[:n]))
+			fmt.Printf(" [NO!]\n<-- Request was denied by node: %v.\nEnter command: ", m.NameMe)
 		} else {
 			fmt.Printf(" [OK]\n")
 		}

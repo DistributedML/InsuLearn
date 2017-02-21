@@ -95,23 +95,27 @@ func connHandler(conn *net.TCPConn) {
 	//p := make([]byte, BUFFSIZE)
 	//conn.Read(p)
 	//logger.UnpackReceive("Received message", p, &msg)
+	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
 	err := dec.Decode(&msg)
 	checkError(err)
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
-		conn.Write([]byte("OK"))
+		enc.Encode(message{0, "", "OK", "", model, gempty})
+		//conn.Write([]byte("OK"))
 		go testModel(msg.Id, msg.Model)
 	case "global_grant":
 		// server is sending global model
-		conn.Write([]byte("OK"))
+		enc.Encode(message{0, "", "OK", "", model, gempty})
+		//conn.Write([]byte("OK"))
 		gmodel = msg.GModel
 		fmt.Printf("\n <-- Pulled global model from server.\nEnter command: ")
 		//go testGlobal(msg.GModel)
 	default:
 		// respond to ping
-		conn.Write([]byte("Unknown command"))
+		//conn.Write([]byte("Unknown command"))
+		enc.Encode(message{0, "", "Unknown command", "", model, gempty})
 	}
 	conn.Close()
 }
@@ -194,32 +198,37 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 }
 
 func tcpSend(msg message) {
-	p := make([]byte, BUFFSIZE)
+	//p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, svaddr)
 	checkError(err)
 	//outbuf := logger.PrepareSend(msg.Type, msg)
 	//_, err = conn.Write(outbuf)
 	enc := gob.NewEncoder(conn)
-	err := enc.Encode(msg)
+	dec := gob.NewDecoder(conn)
+	err = enc.Encode(&msg)
 	checkError(err)
-	n, _ := conn.Read(p)
-	if string(p[:n]) == "OK" {
+	var m message
+	err = dec.Decode(&m)
+	//n, _ := conn.Read(p)
+	if m.NameMe == "OK" {
 		fmt.Printf(" [OK]\n")
 		if msg.Type == "commit_request" {
 			committed = true
 		}
 		if msg.Type == "join_request" {
-			isjoining == false
+			isjoining = false
 		}
-	} else if string(p[:n]) == "OOPS!" {
-		fmt.Println(p[:n])
+		//} else if string(p[:n]) == "OOPS!" {
+	} else if m.NameMe == "OOPS!" {
+		//fmt.Println(p[:n])
 		fmt.Println("OOPS!")
 		fmt.Println("Beofre: ", msg.NameMe, msg.IpMe, msg.Type)
 		//var msgwhat message
 		//logger.UnpackReceive("Received message", outbuf, &msgwhat)
 		//fmt.Println("After: ", msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
 	} else {
-		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
+		//fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
+		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", m.NameMe)
 	}
 }
 
