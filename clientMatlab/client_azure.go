@@ -69,7 +69,7 @@ func main() {
 	//Main function of this server
 	for {
 		//parseUserInput()
-		time.Sleep(time.Duration(5 * time.Second))
+		time.Sleep(time.Duration(2 * time.Second))
 		if !committed {
 			requestCommit()
 		}
@@ -198,7 +198,11 @@ func tcpSend(msg message) {
 			committed = true
 		}
 	} else if string(p[:n]) == "OOPS!" {
+		fmt.Println(p[:n])
 		fmt.Println(msg.NameMe, msg.IpMe, msg.Type)
+		var msgwhat message
+		logger.UnpackReceive("Received message", p, &msgwhat)
+		fmt.Println(msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
 	} else {
 		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
 	}
