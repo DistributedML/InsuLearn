@@ -9,3 +9,4 @@ set YDATA=%DBPATH%\testdata\y1.txt
 go build -o %DBPATH%\clientbayes.exe %DBPATH%\clientMatlab\client_azure.go
 rem start cmd /k %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log
 %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log
+pause
