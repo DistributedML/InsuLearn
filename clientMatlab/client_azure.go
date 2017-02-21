@@ -39,8 +39,8 @@ var (
 
 type message struct {
 	Id     int
-	Ip     string
-	Name   string
+	IpMe   string
+	NameMe string
 	Type   string
 	Model  distmlMatlab.MatModel
 	GModel distmlMatlab.MatGlobalModel
