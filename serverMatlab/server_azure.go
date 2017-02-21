@@ -91,6 +91,7 @@ func connHandler(conn *net.TCPConn) {
 	p := make([]byte, BUFFSIZE)
 	conn.Read(p)
 	logger.UnpackReceive("Received message", p, &msg)
+	fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
 	switch msg.Type {
 	case "commit_request":
 		//node is sending a model, must forward to others for testing
