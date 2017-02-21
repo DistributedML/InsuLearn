@@ -90,10 +90,13 @@ func listener() {
 }
 
 func connHandler(conn *net.TCPConn) {
-	p := make([]byte, BUFFSIZE)
-	conn.Read(p)
 	var msg message
-	logger.UnpackReceive("Received message", p, &msg)
+	//p := make([]byte, BUFFSIZE)
+	//conn.Read(p)
+	//logger.UnpackReceive("Received message", p, &msg)
+	dec := gob.Decoder(conn)
+	err := de.Decode(&msg)
+	checkError(err)
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
@@ -193,8 +196,10 @@ func tcpSend(msg message) {
 	p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, svaddr)
 	checkError(err)
-	outbuf := logger.PrepareSend(msg.Type, msg)
-	_, err = conn.Write(outbuf)
+	//outbuf := logger.PrepareSend(msg.Type, msg)
+	//_, err = conn.Write(outbuf)
+	enc := gob.Encoder(conn)
+	err := enc.Encode(msg)
 	checkError(err)
 	n, _ := conn.Read(p)
 	if string(p[:n]) == "OK" {
@@ -209,9 +214,9 @@ func tcpSend(msg message) {
 		fmt.Println(p[:n])
 		fmt.Println("OOPS!")
 		fmt.Println("Beofre: ", msg.NameMe, msg.IpMe, msg.Type)
-		var msgwhat message
-		logger.UnpackReceive("Received message", outbuf, &msgwhat)
-		fmt.Println("After: ", msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
+		//var msgwhat message
+		//logger.UnpackReceive("Received message", outbuf, &msgwhat)
+		//fmt.Println("After: ", msgwhat.NameMe, msgwhat.IpMe, msgwhat.Type)
 	} else {
 		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
 	}

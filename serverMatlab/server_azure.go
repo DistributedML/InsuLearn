@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"github.com/4180122/distbayes/distmlMatlab"
@@ -27,7 +29,6 @@ var (
 	modelC    map[int]float64
 	modelD    float64
 	channel   chan message
-	conchan   chan *net.TCPConn
 	logger    *govec.GoLog
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
@@ -64,10 +65,8 @@ func main() {
 	testqueue = make(map[int]map[int]bool)
 	cnumhist = make(map[int]int)
 	channel = make(chan message)
-	conchan = make(chan *net.TCPConn)
 
 	go updateGlobal(channel)
-	go connHandler(conchan)
 
 	//Parsing inputargs
 	parseArgs()
@@ -84,18 +83,19 @@ func main() {
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
-		conchan <- conn
-		//go connHandler(conn)
+		go connHandler(conn)
 	}
 
 }
 
-func connHandler(ch chan *net.TCPConn) {
-	conn := <-ch
+func connHandler(conn *net.TCPConn) {
 	var msg message
-	p := make([]byte, BUFFSIZE)
-	conn.Read(p)
-	logger.UnpackReceive("Received message", p, &msg)
+	//p := make([]byte, BUFFSIZE)
+	//conn.Read(p)
+	//logger.UnpackReceive("Received message", p, &msg)
+	dec := gob.Decoder(conn)
+	err := de.Decode(&msg)
+	checkError(err)
 	fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
 	switch msg.Type {
 	case "commit_request":
@@ -219,9 +219,11 @@ func tcpSend(addr *net.TCPAddr, msg message) error {
 	conn, err := net.DialTCP("tcp", nil, addr)
 	//checkError(err)
 	if err == nil {
-		outbuf := logger.PrepareSend(msg.Type, msg)
-		_, err = conn.Write(outbuf)
-		//checkError(err)
+		//outbuf := logger.PrepareSend(msg.Type, msg)
+		//_, err = conn.Write(outbuf)
+		enc := gob.Encoder(conn)
+		err := enc.Encode(msg)
+		checkError(err)
 		n, _ := conn.Read(p)
 		if string(p[:n]) != "OK" {
 			fmt.Printf(" [NO!]\n<-- Request was denied by node: %v.\nEnter command: ", string(p[:n]))
