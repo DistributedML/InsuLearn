@@ -94,8 +94,8 @@ func connHandler(conn *net.TCPConn) {
 	switch msg.Type {
 	case "commit_request":
 		//node is sending a model, must forward to others for testing
-		flag := checkQueue(client[msg.Name])
-		fmt.Printf("<-- Received commit request from %v.\n", msg.Name)
+		flag := checkQueue(client[msg.NameMe])
+		fmt.Printf("<-- Received commit request from %v.\n", msg.NameMe)
 		if flag {
 			conn.Write([]byte("OK"))
 			conn.Close()
@@ -103,21 +103,21 @@ func connHandler(conn *net.TCPConn) {
 		} else {
 			//denied
 			conn.Write([]byte("Pending tests are not complete."))
-			fmt.Printf("--> Denied commit request from %v.\n", msg.Name)
+			fmt.Printf("--> Denied commit request from %v.\n", msg.NameMe)
 			conn.Close()
 		}
 	case "global_request":
 		//node is requesting the global model, will forward
 		conn.Write([]byte("OK"))
-		fmt.Printf("<-- Received global model request from %v.\n", msg.Name)
+		fmt.Printf("<-- Received global model request from %v.\n", msg.NameMe)
 		genGlobalModel() //TODO maybe move this elsewhere
 		sendGlobal(msg)
 		conn.Close()
 	case "test_complete":
 		//node is submitting test results, will update its queue
 		conn.Write([]byte("OK"))
-		fmt.Printf("<-- Received completed test results from %v.\n", msg.Name)
-		testqueue[client[msg.Name]][cnumhist[msg.Id]] = false
+		fmt.Printf("<-- Received completed test results from %v.\n", msg.NameMe)
+		testqueue[client[msg.NameMe]][cnumhist[msg.Id]] = false
 		conn.Close()
 		//update the pending commit and merge if complete
 		channel <- msg
@@ -127,7 +127,7 @@ func connHandler(conn *net.TCPConn) {
 		conn.Close()
 	default:
 		fmt.Println("something weird happened!")
-		fmt.Println(msg.Ip, msg.Name, msg.Type)
+		fmt.Println(msg.IpMe, msg.NameMe, msg.Type)
 		conn.Write([]byte("NO!"))
 		conn.Close()
 	}
@@ -141,7 +141,7 @@ func updateGlobal(ch chan message) {
 		id := cnumhist[m.Id]
 		tempAggregate := tempmodel[id]
 		tempAggregate.d += m.Model.Size
-		tempAggregate.r[client[m.Name]] = m.Model.Weight
+		tempAggregate.r[client[m.NameMe]] = m.Model.Weight
 		tempmodel[id] = tempAggregate
 		if modelD < tempAggregate.d {
 			modelD = tempAggregate.d
@@ -172,11 +172,11 @@ func processTestRequest(m message) {
 	d := m.Model.Size
 	m.Model.Weight = 0.0
 	m.Model.Size = 0.0
-	tempweight[client[m.Name]] = r
-	tempmodel[client[m.Name]] = aggregate{cnum, m.Model, tempweight, d, d}
-	cnumhist[cnum] = client[m.Name]
+	tempweight[client[m.NameMe]] = r
+	tempmodel[client[m.NameMe]] = aggregate{cnum, m.Model, tempweight, d, d}
+	cnumhist[cnum] = client[m.NameMe]
 	for name, id := range client {
-		if id != client[m.Name] {
+		if id != client[m.NameMe] {
 			sendTestRequest(name, id, cnum, m.Model)
 		}
 	}
@@ -203,9 +203,9 @@ func sendTestRequest(name string, id, tcnum int, tmodel distmlMatlab.MatModel) {
 }
 
 func sendGlobal(m message) {
-	fmt.Printf("--> Sending global model to %v.", m.Name)
+	fmt.Printf("--> Sending global model to %v.", m.NameMe)
 	msg := message{m.Id, myaddr.String(), "server", "global_grant", m.Model, gmodel}
-	tcpSend(claddr[client[m.Name]], msg)
+	tcpSend(claddr[client[m.NameMe]], msg)
 }
 
 func tcpSend(addr *net.TCPAddr, msg message) error {
@@ -238,26 +238,26 @@ func checkQueue(id int) bool {
 
 func processJoin(m message) {
 	//process depending on if it is a new node or a returning one
-	if _, ok := client[m.Name]; !ok {
+	if _, ok := client[m.NameMe]; !ok {
 		//adding a node that has never been added before
 		id := maxnode
 		maxnode++
-		client[m.Name] = id
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
-		fmt.Printf("--- Added %v as node%v.\n", m.Name, id)
+		client[m.NameMe] = id
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.IpMe)
+		fmt.Printf("--- Added %v as node%v.\n", m.NameMe, id)
 		for _, v := range tempmodel {
-			sendTestRequest(m.Name, id, v.cnum, v.model)
+			sendTestRequest(m.NameMe, id, v.cnum, v.model)
 			//sendTestRequest(m.Name, id, v.cnum, v.model)
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
-		id := client[m.Name]
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
-		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
+		id := client[m.NameMe]
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.IpMe)
+		fmt.Printf("--- %v at node%v is back online.\n", m.NameMe, id)
 		for k, v := range testqueue[id] {
 			if v {
 				aggregate := tempmodel[k]
-				sendTestRequest(m.Name, id, aggregate.cnum, aggregate.model)
+				sendTestRequest(m.NameMe, id, aggregate.cnum, aggregate.model)
 				//sendTestRequest(m.Name, id, aggregate.cnum, aggregate.model)
 			}
 		}
