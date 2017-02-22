@@ -105,7 +105,7 @@ func connHandler(conn *net.TCPConn) {
 		flag := checkQueue(client[msg.NodeName])
 		fmt.Printf("<-- Received commit request from %v.\n", msg.NodeName)
 		if flag {
-			enc.Encode(response{"OK", ""})
+			enc.Encode(response{"OK", "Committed"})
 			conn.Close()
 			processTestRequest(msg)
 		} else {
@@ -130,7 +130,7 @@ func connHandler(conn *net.TCPConn) {
 		//update the pending commit and merge if complete
 		channel <- msg
 	case "join_request":
-		enc.Encode(response{"OK", ""})
+		enc.Encode(response{"OK", "Joined"})
 		processJoin(msg)
 		conn.Close()
 	default:

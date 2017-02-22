@@ -212,10 +212,9 @@ func tcpSend(msg message) {
 	checkError(err)
 	if r.Resp == "OK" {
 		fmt.Printf(" [OK]\n")
-		if msg.Type == "commit_request" {
+		if r.Error == "Committed" {
 			committed = true
-		}
-		if msg.Type == "join_request" {
+		} else if r.Error == "Joined" {
 			isjoining = false
 		}
 	} else if r.Resp == "NO" {
