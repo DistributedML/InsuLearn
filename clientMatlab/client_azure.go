@@ -37,6 +37,7 @@ var (
 	gempty    distmlMatlab.MatGlobalModel
 	committed bool
 	isjoining bool
+	istesting bool
 )
 
 type message struct {
@@ -76,12 +77,13 @@ func main() {
 	}
 
 	committed = false
+	istesting = false
 
 	//Main function of this server
 	for {
 		//parseUserInput()
 		time.Sleep(time.Duration(2 * time.Second))
-		if !committed {
+		if !committed && !istesting {
 			requestCommit()
 		}
 	}
@@ -189,10 +191,12 @@ func requestGlobal() {
 func testModel(id int, testmodel distmlMatlab.MatModel) {
 	//func testModel(id int, testmodel bclass.Model) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
+	istesting = true
 	distmlMatlab.TestModel(X, Y, &testmodel)
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
+	istesting = false
 	fmt.Printf("Enter command: ")
 }
 
