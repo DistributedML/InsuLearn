@@ -8,6 +8,7 @@ import (
 	"github.com/arcaneiceman/GoVector/govec"
 	"net"
 	"os"
+	"time"
 )
 
 const BUFFSIZE = 400000
@@ -157,7 +158,8 @@ func updateGlobal(ch chan message) {
 			models[id] = tempAggregate.model
 			modelR[id] = tempAggregate.r
 			modelC[id] = tempAggregate.c
-			logger.LogLocalEvent("commit_complete")
+			t := time.Now()
+			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v for commit number: %v", t.Format("15:04:05:00"), id, tempAggregate.cnum))
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
 		}
 	}
@@ -253,6 +255,8 @@ func processJoin(m message) {
 		client[m.NodeName] = id
 		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
+		t := time.Now()
+		logger.LogLocalEvent(fmt.Sprintf("%s - Added %v as node %v.", t.Format("15:04:05:00"), m.NodeName, id))
 		for _, v := range tempmodel {
 			sendTestRequest(m.NodeName, id, v.cnum, v.model)
 		}
