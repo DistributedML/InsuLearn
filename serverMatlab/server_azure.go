@@ -125,10 +125,14 @@ func connHandler(conn *net.TCPConn) {
 		//node is submitting test results, will update its queue
 		enc.Encode(response{"OK", ""})
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.NodeName)
-		testqueue[client[msg.NodeName]][cnumhist[msg.Id]] = false
+		t := time.Now()
+		logger.LogLocalEvent(fmt.Sprintf("%s - Received completed test results from %v for cnum: %v", t.Format("15:04:05.0000"), msg.NodeName, msg.Id))
 		conn.Close()
 		//update the pending commit and merge if complete
-		channel <- msg
+		if testqueue[client[msg.NodeName]][cnumhist[msg.Id]] {
+			testqueue[client[msg.NodeName]][cnumhist[msg.Id]] = false
+			channel <- msg
+		}
 	case "join_request":
 		enc.Encode(response{"OK", "Joined"})
 		processJoin(msg)
