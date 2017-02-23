@@ -188,7 +188,7 @@ func processTestRequest(m message) {
 	cnumhist[tempcnum] = client[m.NodeName]
 	for name, id := range client {
 		if id != client[m.NodeName] {
-			go sendTestRequest(name, id, tempcnum, m.Model)
+			sendTestRequest(name, id, tempcnum, m.Model)
 		}
 	}
 }
@@ -202,14 +202,22 @@ func sendTestRequest(name string, id, tcnum int, tmodel distmlMatlab.MatModel) {
 		queue := make(map[int]bool)
 		queue[cnumhist[tcnum]] = true
 		testqueue[id] = queue
+		//send the request
+		fmt.Printf("--> Sending test request from %v to %v.", cnumhist[tcnum], name)
+		err := tcpSend(claddr[id], msg)
+		if err != nil {
+			fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
+		}
 	} else {
-		queue[cnumhist[tcnum]] = true
-	}
-	//send the request
-	fmt.Printf("--> Sending test request from %v to %v.", cnumhist[tcnum], name)
-	err := tcpSend(claddr[id], msg)
-	if err != nil {
-		fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
+		if !queue[cnumhist[cnum]] {
+			queue[cnumhist[tcnum]] = true
+			//send the request
+			fmt.Printf("--> Sending test request from %v to %v.", cnumhist[tcnum], name)
+			err := tcpSend(claddr[id], msg)
+			if err != nil {
+				fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
+			}
+		}
 	}
 }
 
@@ -258,7 +266,7 @@ func processJoin(m message) {
 		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 		for _, v := range tempmodel {
-			go sendTestRequest(m.NodeName, id, v.cnum, v.model)
+			sendTestRequest(m.NodeName, id, v.cnum, v.model)
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
@@ -268,7 +276,7 @@ func processJoin(m message) {
 		for k, v := range testqueue[id] {
 			if v {
 				aggregatesendtest := tempmodel[k]
-				go sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
+				sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
 			}
 		}
 	}
