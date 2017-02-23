@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"flag"
 	"fmt"
@@ -184,7 +185,11 @@ func (n *node) processSnapshot(snapshot raftpb.Snapshot) {
 func (n *node) process(entry raftpb.Entry) {
 	if entry.Type == raftpb.EntryNormal && entry.Data != nil {
 		var repstate state
-		logger.UnpackReceive("got propose", entry.Data, &repstate)
+		var buf bytes.Buffer
+		dec := gob.NewDecoder(&buf)
+		buf.Write(entry.Data)
+		dec.Decode(&repstate)
+		//logger.UnpackReceive("got propose", entry.Data, &repstate)
 		//repstate = entry.Data
 		mynode.propID = repstate.PropID
 		if repstate.Cnum > mynode.cnum {
@@ -378,8 +383,11 @@ func replicate(m state) bool {
 
 	r := rand.Intn(999999999999)
 	m.PropID = r
-	buf := logger.PrepareSend("packing to servers", m)
-	err := mynode.raft.Propose(mynode.ctx, buf)
+	var buf bytes.Buffer
+	//buf := logger.PrepareSend("packing to servers", m)
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(m)
+	err = mynode.raft.Propose(mynode.ctx, buf.Bytes())
 
 	if err == nil {
 		//block and check the status of the proposal
