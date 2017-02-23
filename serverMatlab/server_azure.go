@@ -159,7 +159,7 @@ func updateGlobal(ch chan message) {
 			modelD = tempAggregate.d
 		}
 		fmt.Println(modelD, m.Model.Size, m.Id, m.NodeName, tempAggregate.d)
-		if float64(tempAggregate.d) > float64(modelD)*0.2 {
+		if float64(tempAggregate.d) > float64(modelD)*0.6 {
 			models[id] = tempAggregate.model
 			modelR[id] = tempAggregate.r
 			modelC[id] = tempAggregate.c
@@ -262,8 +262,6 @@ func processJoin(m message) {
 		client[m.NodeName] = id
 		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
-		t := time.Now()
-		logger.LogLocalEvent(fmt.Sprintf("%s - Added %v as node %v.", t.Format("15:04:05:00"), m.NodeName, id))
 		for _, v := range tempmodel {
 			sendTestRequest(m.NodeName, id, v.cnum, v.model)
 		}
@@ -274,8 +272,8 @@ func processJoin(m message) {
 		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 		for k, v := range testqueue[id] {
 			if v {
-				aggregate := tempmodel[k]
-				sendTestRequest(m.NodeName, id, aggregate.cnum, aggregate.model)
+				aggregatesendtest := tempmodel[k]
+				sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
 			}
 		}
 	}
