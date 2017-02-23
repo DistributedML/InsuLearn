@@ -181,11 +181,11 @@ func processTestRequest(m message) {
 	//initialize new aggregate
 	tempweight := make(map[int]float64)
 	r := m.Model.Weight
-	d := m.Model.Size
+	c := m.Model.Size
 	m.Model.Weight = 0.0
 	m.Model.Size = 0.0
 	tempweight[client[m.NodeName]] = r
-	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, d, d}
+	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, 0.0, c}
 	cnumhist[tempcnum] = client[m.NodeName]
 	for name, id := range client {
 		if id != client[m.NodeName] {
