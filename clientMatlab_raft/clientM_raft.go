@@ -1,6 +1,6 @@
 package main
 
-import(
+import (
 	"bufio"
 	"flag"
 	"fmt"
@@ -11,12 +11,10 @@ import(
 	"net"
 	"os"
 	//"strconv"
+	"encoding/gob"
 	"strings"
-	
+	"time"
 )
-const BUFFSIZE = 200000
-
-//10485760
 
 var (
 	cnum      int     = 0
@@ -36,25 +34,33 @@ var (
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
+	committed bool
+	isjoining bool
+	istesting int = 0
 )
 
 type message struct {
-	Id     int
-	Ip     string
-	Name   string
-	Type   string
-	Model  distmlMatlab.MatModel
-	GModel distmlMatlab.MatGlobalModel
+	Id       int
+	NodeIp   string
+	NodeName string
+	Type     string
+	Model    distmlMatlab.MatModel
+	GModel   distmlMatlab.MatGlobalModel
 }
+
+type response struct {
+	Resp  string
+	Error string
+}
+
 func main() {
 	//Parsing inputargs
 	parseArgs()
 
-//Hacky solution to the Matlab problem (Mathworks, please fix this!)
+	//Hacky solution to the Matlab problem (Mathworks, please fix this!)
 	// see: https://www.mathworks.com/matlabcentral/answers/305877-what-is-the-primary-message-table-for-module-77
 	// and  https://github.com/JuliaInterop/MATLAB.jl/issues/47
 	distmlMatlab.Hack()
-
 
 	//Initialize stuff
 	model = distmlMatlab.NewModel(X, Y)
@@ -63,13 +69,23 @@ func main() {
 	l, _ = net.ListenTCP("tcp", myaddr)
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
-	requestJoin()
+	isjoining = true
+	for isjoining {
+		requestJoin()
+	}
+	committed = false
 
+	time.Sleep(time.Duration(2 * time.Second))
 	//Main function of this server
 	for {
 		parseUserInput()
+		//time.Sleep(time.Duration(2 * time.Second))
+		//if !committed && (istesting == 0) {
+		//	requestCommit()
+		//}
 	}
 }
+
 func listener() {
 	for {
 		conn, err := l.AcceptTCP()
@@ -77,28 +93,31 @@ func listener() {
 		go connHandler(conn)
 	}
 }
+
 func connHandler(conn *net.TCPConn) {
-	p := make([]byte, BUFFSIZE)
-	conn.Read(p)
 	var msg message
-	logger.UnpackReceive("Received message", p, &msg)
+	enc := gob.NewEncoder(conn)
+	dec := gob.NewDecoder(conn)
+	err := dec.Decode(&msg)
+	checkError(err)
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
-		conn.Write([]byte("OK"))
+		enc.Encode(response{"OK", ""})
 		go testModel(msg.Id, msg.Model)
 	case "global_grant":
 		// server is sending global model
-		conn.Write([]byte("OK"))
+		enc.Encode(response{"OK", ""})
 		gmodel = msg.GModel
 		fmt.Printf("\n <-- Pulled global model from server.\nEnter command: ")
 		//go testGlobal(msg.GModel)
 	default:
 		// respond to ping
-		conn.Write([]byte("Unknown command"))
+		enc.Encode(response{"NO", "Unknown Command"})
 	}
 	conn.Close()
 }
+
 func parseUserInput() {
 	var ident string
 	reader := bufio.NewReader(os.Stdin)
@@ -164,6 +183,7 @@ func requestGlobal() {
 	fmt.Printf(" --> Requesting global model from server.")
 	tcpSend(msg)
 }
+
 func testModel(id int, testmodel distmlMatlab.MatModel) {
 	//func testModel(id int, testmodel bclass.Model) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
@@ -173,27 +193,41 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 	tcpSend(msg)
 	fmt.Printf("Enter command: ")
 }
+
 func tcpSend(msg message) {
-	p := make([]byte, BUFFSIZE)
 	var err error
 	var conn *net.TCPConn
 	for _, v := range svaddr {
 		conn, err = net.DialTCP("tcp", nil, v)
+		checkError(err)
 		if err == nil {
 			break
 		}
 	}
+	enc := gob.NewEncoder(conn)
+	dec := gob.NewDecoder(conn)
+
+	err = enc.Encode(&msg)
 	checkError(err)
-	outbuf := logger.PrepareSend(msg.Type, msg)
-	_, err = conn.Write(outbuf)
+	var r response
+	err = dec.Decode(&r)
 	checkError(err)
-	n, _ := conn.Read(p)
-	if string(p[:n]) != "OK" {
-		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
-	} else {
+
+	if r.Resp == "OK" {
 		fmt.Printf(" [OK]\n")
+		if r.Error == "Committed" {
+			committed = true
+		} else if r.Error == "Joined" {
+			isjoining = false
+		}
+	} else if r.Resp == "NO" {
+		fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
+	} else {
+		fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 	}
+
 }
+
 // func readData(filename string) *mat64.Dense {
 // 	dat, err := ioutil.ReadFile(filename)
 // 	checkError(err)
@@ -215,6 +249,7 @@ func parseArgs() {
 	flag.Parse()
 	inputargs = flag.Args()
 	var err error
+	svaddr = make(map[int]*net.TCPAddr)
 	if len(inputargs) < 2 {
 		fmt.Printf("Not enough inputs.\n")
 		return
@@ -231,14 +266,18 @@ func parseArgs() {
 	Yt = "C:/work/src/github.com/4180122/distbayes/testdata/yv.txt"
 	logger = govec.Initialize(inputargs[0], inputargs[5])
 }
+
 func getNodeAddr(slavefile string) {
 	dat, err := ioutil.ReadFile(slavefile)
 	checkError(err)
 	nodestr := strings.Split(string(dat), " ")
+	//fmt.Println(nodestr)
 	for i := 0; i < len(nodestr)-1; i++ {
 		svaddr[i], _ = net.ResolveTCPAddr("tcp", nodestr[i])
 	}
+	fmt.Println(svaddr)
 }
+
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
