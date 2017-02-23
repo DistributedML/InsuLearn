@@ -2,16 +2,14 @@ package main
 
 import (
 	"bufio"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"github.com/4180122/distbayes/distmlMatlab"
 	"github.com/arcaneiceman/GoVector/govec"
-	//"github.com/gonum/matrix/mat64"
 	"io/ioutil"
 	"net"
 	"os"
-	//"strconv"
-	"encoding/gob"
 	"strings"
 	"time"
 )
@@ -23,7 +21,6 @@ var (
 	name      string
 	inputargs []string
 	myaddr    *net.TCPAddr
-	//svaddr    *net.TCPAddr
 	svaddr    map[int]*net.TCPAddr
 	model     distmlMatlab.MatModel
 	logger    *govec.GoLog
@@ -69,20 +66,22 @@ func main() {
 	l, _ = net.ListenTCP("tcp", myaddr)
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
+
 	isjoining = true
 	for isjoining {
 		requestJoin()
 	}
+
 	committed = false
 
 	time.Sleep(time.Duration(2 * time.Second))
 	//Main function of this server
 	for {
-		parseUserInput()
-		//time.Sleep(time.Duration(2 * time.Second))
-		//if !committed && (istesting == 0) {
-		//	requestCommit()
-		//}
+		//parseUserInput()
+		time.Sleep(time.Duration(2 * time.Second))
+		if !committed && (istesting == 0) {
+			requestCommit()
+		}
 	}
 }
 
@@ -135,7 +134,7 @@ func parseUserInput() {
 		//y = readData(inputargs[4])
 		fmt.Printf(" --- Local data updated.\n")
 	case "train":
-		model = distmlMatlab.NewModel(X, Y) //GOOD
+		model = distmlMatlab.NewModel(X, Y)
 		fmt.Printf(" --- Local model error on local data is: %v.\n", model.Weight)
 	case "push":
 		requestCommit()
@@ -165,6 +164,7 @@ func parseUserInput() {
 		fmt.Printf("  who   -- Print node name\n\n")
 	}
 }
+
 func requestJoin() {
 	msg := message{cnum, myaddr.String(), name, "join_request", model, gempty}
 	fmt.Printf(" --> Asking server to join.")
@@ -172,7 +172,6 @@ func requestJoin() {
 }
 
 func requestCommit() {
-	cnum++
 	msg := message{cnum, myaddr.String(), name, "commit_request", model, gempty}
 	fmt.Printf(" --> Pushing local model to server.")
 	tcpSend(msg)
@@ -185,12 +184,13 @@ func requestGlobal() {
 }
 
 func testModel(id int, testmodel distmlMatlab.MatModel) {
-	//func testModel(id int, testmodel bclass.Model) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
+	istesting++
 	distmlMatlab.TestModel(X, Y, &testmodel)
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
+	istesting--
 	fmt.Printf("Enter command: ")
 }
 
@@ -228,23 +228,6 @@ func tcpSend(msg message) {
 
 }
 
-// func readData(filename string) *mat64.Dense {
-// 	dat, err := ioutil.ReadFile(filename)
-// 	checkError(err)
-// 	array := strings.Split(string(dat), "\n")
-// 	r := len(array) - 1
-// 	temp := strings.Split(array[0], ",")
-// 	c := len(temp)
-// 	vdat := make([]float64, c*r)
-// 	for i := 0; i < r; i++ {
-// 		temp = strings.Split(array[i], ",")
-// 		for j := 0; j < c; j++ {
-// 			vdat[i*c+j], _ = strconv.ParseFloat(temp[j], 64)
-// 		}
-// 	}
-// 	return mat64.NewDense(r, c, vdat)
-// }
-
 func parseArgs() {
 	flag.Parse()
 	inputargs = flag.Args()
@@ -257,7 +240,6 @@ func parseArgs() {
 	name = inputargs[0]
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[1])
 	checkError(err)
-	//svaddr, err = net.ResolveTCPAddr("tcp", inputargs[2])
 	getNodeAddr(inputargs[2])
 	checkError(err)
 	X = inputargs[3]
@@ -271,7 +253,6 @@ func getNodeAddr(slavefile string) {
 	dat, err := ioutil.ReadFile(slavefile)
 	checkError(err)
 	nodestr := strings.Split(string(dat), " ")
-	//fmt.Println(nodestr)
 	for i := 0; i < len(nodestr)-1; i++ {
 		svaddr[i], _ = net.ResolveTCPAddr("tcp", nodestr[i])
 	}

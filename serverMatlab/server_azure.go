@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-const BUFFSIZE = 400000
-
 var (
 	cnum      int = 0
 	maxnode   int = 0
@@ -184,7 +182,7 @@ func processTestRequest(m message) {
 	m.Model.Weight = 0.0
 	m.Model.Size = 0.0
 	tempweight[client[m.NodeName]] = r
-	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, 0.0, c}
+	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, c, c}
 	cnumhist[tempcnum] = client[m.NodeName]
 	for name, id := range client {
 		if id != client[m.NodeName] {

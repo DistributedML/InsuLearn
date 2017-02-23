@@ -129,7 +129,7 @@ func parseUserInput() {
 		//y = readData(inputargs[4])
 		fmt.Printf(" --- Local data updated.\n")
 	case "train":
-		model = distmlMatlab.NewModel(X, Y) //GOOD
+		model = distmlMatlab.NewModel(X, Y)
 		fmt.Printf(" --- Local model error on local data is: %v.\n", model.Weight)
 	case "push":
 		requestCommit()
@@ -179,7 +179,6 @@ func requestGlobal() {
 }
 
 func testModel(id int, testmodel distmlMatlab.MatModel) {
-	//func testModel(id int, testmodel bclass.Model) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
 	istesting++
 	distmlMatlab.TestModel(X, Y, &testmodel)
