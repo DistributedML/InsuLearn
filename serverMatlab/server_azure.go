@@ -155,7 +155,7 @@ func updateGlobal(ch chan message) {
 			modelD = tempAggregate.d
 		}
 		fmt.Println(modelD, m.Model.Size, m.Id, m.NodeName, tempAggregate.d)
-		if float64(tempAggregate.d) > float64(modelD)*0.6 {
+		if float64(tempAggregate.d) > float64(modelD)*0.2 {
 			models[id] = tempAggregate.model
 			modelR[id] = tempAggregate.r
 			modelC[id] = tempAggregate.c
