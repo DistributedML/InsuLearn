@@ -2,17 +2,13 @@ package main
 
 import (
 	"bufio"
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"github.com/4180122/distbayes/distmlMatlab"
 	"github.com/arcaneiceman/GoVector/govec"
-	//"github.com/gonum/matrix/mat64"
-	//"io/ioutil"
 	"net"
 	"os"
-	//"strconv"
-	//"strings"
-	"encoding/gob"
 	"time"
 )
 
@@ -77,7 +73,7 @@ func main() {
 	//Main function of this server
 	for {
 		//parseUserInput()
-		time.Sleep(time.Duration(5 * time.Second))
+		time.Sleep(time.Duration(1 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
@@ -98,9 +94,6 @@ func connHandler(conn *net.TCPConn) {
 	dec := gob.NewDecoder(conn)
 	err := dec.Decode(&msg)
 	checkError(err)
-	//if cnum < msg.Id {
-	//	cnum == msg.Id
-	//}
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
@@ -174,7 +167,6 @@ func requestJoin() {
 }
 
 func requestCommit() {
-	//cnum++
 	msg := message{cnum, myaddr.String(), name, "commit_request", model, gempty}
 	fmt.Printf(" --> Pushing local model to server.")
 	tcpSend(msg)

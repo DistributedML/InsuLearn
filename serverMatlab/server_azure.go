@@ -13,8 +13,6 @@ import (
 
 const BUFFSIZE = 400000
 
-//10485760
-
 var (
 	cnum      int = 0
 	maxnode   int = 0
@@ -125,8 +123,6 @@ func connHandler(conn *net.TCPConn) {
 		//node is submitting test results, will update its queue
 		enc.Encode(response{"OK", ""})
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.NodeName)
-		t := time.Now()
-		logger.LogLocalEvent(fmt.Sprintf("%s - Received completed test results from %v for cnum: %v", t.Format("15:04:05.0000"), msg.NodeName, msg.Id))
 		conn.Close()
 		//update the pending commit and merge if complete
 		if testqueue[client[msg.NodeName]][cnumhist[msg.Id]] {
@@ -138,8 +134,7 @@ func connHandler(conn *net.TCPConn) {
 		processJoin(msg)
 		conn.Close()
 	default:
-		fmt.Println("something weird happened!")
-		//fmt.Println(msg.NodeIp, msg.NodeName, msg.Type)
+		fmt.Printf("something weird happened!\n")
 		enc.Encode(response{"NO", "Unknown Request"})
 		conn.Close()
 	}
@@ -158,13 +153,13 @@ func updateGlobal(ch chan message) {
 		if modelD < tempAggregate.d {
 			modelD = tempAggregate.d
 		}
-		fmt.Println(modelD, m.Model.Size, m.Id, m.NodeName, tempAggregate.d)
 		if float64(tempAggregate.d) > float64(modelD)*0.6 {
 			models[id] = tempAggregate.model
 			modelR[id] = tempAggregate.r
 			modelC[id] = tempAggregate.c
+			fmt.Println(modelD, m.Model.Size, m.Id, m.NodeName, tempAggregate.d)
 			t := time.Now()
-			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v for commit number: %v", t.Format("15:04:05.0000"), id, tempAggregate.cnum))
+			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v by %v at partial commit %v.", t.Format("15:04:05.0000"), id, client[m.NodeName], tempAggregate.d/modelD*100.0))
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
 		}
 	}
@@ -193,7 +188,7 @@ func processTestRequest(m message) {
 	cnumhist[tempcnum] = client[m.NodeName]
 	for name, id := range client {
 		if id != client[m.NodeName] {
-			sendTestRequest(name, id, tempcnum, m.Model)
+			go sendTestRequest(name, id, tempcnum, m.Model)
 		}
 	}
 }
@@ -263,7 +258,7 @@ func processJoin(m message) {
 		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 		for _, v := range tempmodel {
-			sendTestRequest(m.NodeName, id, v.cnum, v.model)
+			go sendTestRequest(m.NodeName, id, v.cnum, v.model)
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
@@ -273,7 +268,7 @@ func processJoin(m message) {
 		for k, v := range testqueue[id] {
 			if v {
 				aggregatesendtest := tempmodel[k]
-				sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
+				go sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
 			}
 		}
 	}
