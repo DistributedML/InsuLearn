@@ -39,8 +39,8 @@ type aggregate struct {
 	cnum  int
 	model distmlMatlab.MatModel
 	r     map[int]float64
-	c     float64
 	d     float64
+	c     float64
 }
 
 type message struct {
@@ -174,8 +174,10 @@ func genGlobalModel() {
 	gmodel = distmlMatlab.CompactGlobal(modelstemp, modelRtemp, modelCtemp, modelDtemp)
 }
 
+//TODO this might be the problem!
 func processTestRequest(m message) {
 	cnum++
+	tempcnum := cnum
 	//initialize new aggregate
 	tempweight := make(map[int]float64)
 	r := m.Model.Weight
@@ -183,11 +185,11 @@ func processTestRequest(m message) {
 	m.Model.Weight = 0.0
 	m.Model.Size = 0.0
 	tempweight[client[m.NodeName]] = r
-	tempmodel[client[m.NodeName]] = aggregate{cnum, m.Model, tempweight, d, d}
-	cnumhist[cnum] = client[m.NodeName]
+	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, d, d}
+	cnumhist[tempcnum] = client[m.NodeName]
 	for name, id := range client {
 		if id != client[m.NodeName] {
-			sendTestRequest(name, id, cnum, m.Model)
+			sendTestRequest(name, id, tempcnum, m.Model)
 		}
 	}
 }

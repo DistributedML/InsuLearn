@@ -77,7 +77,7 @@ func main() {
 	//Main function of this server
 	for {
 		//parseUserInput()
-		time.Sleep(time.Duration(2 * time.Second))
+		time.Sleep(time.Duration(5 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
@@ -98,6 +98,9 @@ func connHandler(conn *net.TCPConn) {
 	dec := gob.NewDecoder(conn)
 	err := dec.Decode(&msg)
 	checkError(err)
+	//if cnum < msg.Id {
+	//	cnum == msg.Id
+	//}
 	switch msg.Type {
 	case "test_request":
 		// server is asking me to test
@@ -171,7 +174,7 @@ func requestJoin() {
 }
 
 func requestCommit() {
-	cnum++
+	//cnum++
 	msg := message{cnum, myaddr.String(), name, "commit_request", model, gempty}
 	fmt.Printf(" --> Pushing local model to server.")
 	tcpSend(msg)
