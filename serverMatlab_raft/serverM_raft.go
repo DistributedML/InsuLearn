@@ -239,7 +239,6 @@ func (n *node) receive(conn *net.TCPConn) {
 	// Echo all incoming data.
 	var imsg raftpb.Message
 	dec := gob.NewDecoder(conn)
-	//enc := gob.NewEncoder(conn)
 	err := dec.Decode(&imsg)
 	checkError(err)
 	conn.Close()
@@ -289,6 +288,12 @@ func main() {
 		go mynode.receive(conn)
 	}
 
+}
+
+func printLeader() {
+	time.Sleep(time.Second * 2)
+	sts := mynode.Status()
+	fmt.Println(sts.SoftState.Leader)
 }
 
 func clientListener(listen *net.TCPListener) {
