@@ -282,6 +282,8 @@ func main() {
 
 	go clientListener(cl)
 
+	go printLeader()
+
 	for {
 		conn, err := sl.AcceptTCP()
 		checkError(err)
@@ -291,7 +293,7 @@ func main() {
 }
 
 func printLeader() {
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 5)
 	sts := mynode.Status()
 	fmt.Println(sts.SoftState.Leader)
 }
