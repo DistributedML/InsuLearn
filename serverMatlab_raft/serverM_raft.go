@@ -265,7 +265,7 @@ func main() {
 	gmodel = distmlMatlab.MatGlobalModel{nil}
 	channel = make(chan message)
 	// start a small cluster
-	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
+	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}})
 
 	go mynode.run()
 	//go printLeader()
@@ -576,9 +576,6 @@ func parseArgs() {
 	getNodeAddr(inputargs[1])
 	temp, _ := strconv.ParseInt(inputargs[2], 10, 64)
 	nID = int(temp)
-	fmt.Println("*********************************")
-	fmt.Println(naddr)
-	fmt.Println("*********************************")
 }
 
 func getNodeAddr(slavefile string) {
