@@ -273,7 +273,8 @@ func main() {
 	gmodel = distmlMatlab.MatGlobalModel{nil}
 	channel = make(chan message)
 	// start a small cluster
-	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}})
+	//mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}})
+	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
 
 	go mynode.run()
 	//go printLeader()
@@ -564,7 +565,7 @@ func processJoin(m message, conn *net.TCPConn) {
 
 		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 
-		time.Sleep(time.Second * 2)
+		//time.Sleep(time.Second * 2)
 		for k, v := range mynode.testqueue[id] {
 			if v {
 				aggregate := mynode.tempmodel[k]
