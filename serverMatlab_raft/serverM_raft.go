@@ -416,7 +416,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	//initialize new aggregate
 	tempweight := make(map[int]float64)
 	r := m.Model.Weight
-	d := m.Model.Size
+	c := m.Model.Size
 	m.Model.Weight = 0.0
 	m.Model.Size = 0.0
 	tempweight[mynode.client[m.NodeName]] = r
@@ -431,7 +431,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 
 	//update temp tempmodel and cnumhist
 	tempcnumhist[tempcnum] = mynode.client[m.NodeName]
-	temptempmodel[mynode.client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, d, d}
+	temptempmodel[mynode.client[m.NodeName]] = aggregate{tempcnum, m.Model, tempweight, c, c}
 
 	//update replicate queue
 	for _, id := range mynode.client {
