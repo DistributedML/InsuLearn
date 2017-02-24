@@ -557,7 +557,7 @@ func processJoin(m message, conn *net.TCPConn) {
 		id := mynode.client[m.NodeName]
 
 		//replication
-		tempaddr[id] = m.NodeIP //FIXED IT! :D
+		tempaddr[id] = m.NodeIp //FIXED IT! :D
 		tempmsg := message{}
 		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
 		replicate(repstate)

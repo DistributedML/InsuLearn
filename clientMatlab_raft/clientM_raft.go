@@ -36,6 +36,7 @@ var (
 	isjoining bool = true
 	isrunning bool = true
 	istesting int  = 0
+	connected int  = 0
 )
 
 type message struct {
@@ -81,7 +82,7 @@ func main() {
 			requestCommit()
 		}
 		if committed && (rand.Float64() < (1.0 / 150.0)) {
-			isrunning = false
+			//isrunning = false
 		}
 	}
 
@@ -91,6 +92,7 @@ func listener() {
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
+		connected++
 		go connHandler(conn)
 	}
 }
@@ -117,6 +119,7 @@ func connHandler(conn *net.TCPConn) {
 		enc.Encode(response{"NO", "Unknown Command"})
 	}
 	conn.Close()
+	connected--
 }
 
 func parseUserInput() {
