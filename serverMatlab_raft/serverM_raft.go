@@ -254,6 +254,9 @@ func main() {
 	//Parsing inputargs
 	parseArgs()
 
+	nodeRaftIP := strings.Split(naddr[nID], ":")
+	nodeRaftPort := ":" + nodeRaftIP[1]
+	fmt.Println(nodeRaftPort)
 	raftaddr, _ := net.ResolveTCPAddr("tcp", naddr[nID])
 	sl, err := net.ListenTCP("tcp", raftaddr)
 	checkError(err)
