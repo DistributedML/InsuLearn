@@ -105,8 +105,8 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		store: store,
 		cfg: &raft.Config{
 			ID:              id,
-			ElectionTick:    20 * hb,
-			HeartbeatTick:   4 * hb,
+			ElectionTick:    30 * hb,
+			HeartbeatTick:   3 * hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
@@ -264,7 +264,7 @@ func main() {
 	gmodel = distmlMatlab.MatGlobalModel{nil}
 	channel = make(chan message)
 	// start a small cluster
-	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}})
+	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
 	if nID == 1 {
 		mynode.raft.Campaign(mynode.ctx)
 	}
