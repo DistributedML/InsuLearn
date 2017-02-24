@@ -362,9 +362,12 @@ func connHandler(conn *net.TCPConn) {
 			fmt.Printf("--> Could not process test from %v.\n", msg.NodeName)
 		}
 		conn.Close()
-	default:
+	case "join_request":
 		enc.Encode(response{"OK", "Joined"})
 		processJoin(msg, conn)
+	default:
+		fmt.Printf("something weird happened!\n")
+		enc.Encode(response{"NO", "Unknown Request"})
 		conn.Close()
 	}
 }
