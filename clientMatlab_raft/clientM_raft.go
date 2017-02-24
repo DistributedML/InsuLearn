@@ -8,6 +8,7 @@ import (
 	"github.com/4180122/distbayes/distmlMatlab"
 	"github.com/arcaneiceman/GoVector/govec"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -31,9 +32,10 @@ var (
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
-	committed bool
-	isjoining bool
-	istesting int = 0
+	committed bool = false
+	isjoining bool = true
+	isrunning bool = true
+	istesting int  = 0
 )
 
 type message struct {
@@ -67,22 +69,22 @@ func main() {
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
 
-	isjoining = true
 	for isjoining {
 		requestJoin()
 	}
 
-	committed = false
-
 	time.Sleep(time.Duration(2 * time.Second))
 	//Main function of this server
-	for {
-		//parseUserInput()
+	for isrunning {
 		time.Sleep(time.Duration(2 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
+		if committed && (rand.Float64() < (1.0 / 60.0)) {
+			isrunning = false
+		}
 	}
+
 }
 
 func listener() {
@@ -247,6 +249,9 @@ func parseArgs() {
 	Xt = "C:/work/src/github.com/4180122/distbayes/testdata/xv.txt"
 	Yt = "C:/work/src/github.com/4180122/distbayes/testdata/yv.txt"
 	logger = govec.Initialize(inputargs[0], inputargs[5])
+	if inputargs[6] == "1" {
+		committed = true
+	}
 }
 
 func getNodeAddr(slavefile string) {
