@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 100
+const hb = 2
 
 var (
 	naddr   map[int]string
@@ -106,7 +106,7 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		cfg: &raft.Config{
 			ID:              id,
 			ElectionTick:    10 * hb,
-			HeartbeatTick:   1 * hb,
+			HeartbeatTick:   2 * hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
@@ -266,13 +266,14 @@ func main() {
 	channel = make(chan message)
 	// start a small cluster
 	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
-	if nID == 1 {
-		mynode.raft.Campaign(mynode.ctx)
-	}
 
 	go mynode.run()
 	//go printLeader()
 
+	if nID == 1 {
+		time.Sleep(time.Second * 10)
+		mynode.raft.Campaign(mynode.ctx)
+	}
 	//Hacky solution to the Matlab problem (Mathworks, please fix this!)
 	// see: https://www.mathworks.com/matlabcentral/answers/305877-what-is-the-primary-message-table-for-module-77
 	// and  https://github.com/JuliaInterop/MATLAB.jl/issues/47
