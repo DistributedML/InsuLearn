@@ -577,7 +577,7 @@ func parseArgs() {
 	temp, _ := strconv.ParseInt(inputargs[2], 10, 64)
 	nID = int(temp)
 	fmt.Println("*********************************")
-	fmt.Println(nodestr)
+	fmt.Println(naddr)
 	fmt.Println("*********************************")
 }
 
