@@ -293,9 +293,11 @@ func main() {
 }
 
 func printLeader() {
-	time.Sleep(time.Second * 5)
-	sts := mynode.raft.Status()
-	fmt.Println(sts.SoftState.Leader)
+	for {
+		time.Sleep(time.Second * 5)
+		sts := mynode.raft.Status()
+		fmt.Println(sts.SoftState.Leader)
+	}
 }
 
 func clientListener(listen *net.TCPListener) {
