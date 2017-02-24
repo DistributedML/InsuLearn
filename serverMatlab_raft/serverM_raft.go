@@ -240,7 +240,12 @@ func (n *node) receive(conn *net.TCPConn) {
 	var imsg raftpb.Message
 	dec := gob.NewDecoder(conn)
 	err := dec.Decode(&imsg)
-	checkError(err)
+	if err != nil {
+		fmt.Println("This is where it failed!")
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	//checkError(err)
 	conn.Close()
 	n.raft.Step(n.ctx, imsg)
 }
