@@ -264,7 +264,7 @@ func main() {
 	gmodel = distmlMatlab.MatGlobalModel{nil}
 	channel = make(chan message)
 	// start a small cluster
-	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}})
+	mynode = newNode(uint64(nID), []raft.Peer{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}, {ID: 6}, {ID: 7}})
 	if nID == 1 {
 		mynode.raft.Campaign(mynode.ctx)
 	}
