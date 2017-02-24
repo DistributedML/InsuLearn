@@ -294,7 +294,7 @@ func main() {
 
 func printLeader() {
 	time.Sleep(time.Second * 5)
-	sts := mynode.Status()
+	sts := mynode.raft.Status()
 	fmt.Println(sts.SoftState.Leader)
 }
 
