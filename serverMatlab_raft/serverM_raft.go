@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 1
+const hb = 100
 
 var (
 	naddr   map[int]string
@@ -105,8 +105,8 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		store: store,
 		cfg: &raft.Config{
 			ID:              id,
-			ElectionTick:    30 * hb,
-			HeartbeatTick:   3 * hb,
+			ElectionTick:    10 * hb,
+			HeartbeatTick:   1 * hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
@@ -244,6 +244,7 @@ func (n *node) receive(conn *net.TCPConn) {
 	conn.Close()
 	n.raft.Step(n.ctx, imsg)
 }
+
 func main() {
 	//Parsing inputargs
 	parseArgs()
