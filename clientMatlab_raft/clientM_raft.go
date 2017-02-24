@@ -73,7 +73,7 @@ func main() {
 		requestJoin()
 	}
 
-	time.Sleep(time.Duration(2 * time.Second))
+	//time.Sleep(time.Duration(2 * time.Second))
 	//Main function of this server
 	for isrunning {
 		time.Sleep(time.Duration(2 * time.Second))
