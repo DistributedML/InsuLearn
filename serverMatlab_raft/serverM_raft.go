@@ -557,14 +557,14 @@ func processJoin(m message, conn *net.TCPConn) {
 		id := mynode.client[m.NodeName]
 
 		//replication
-		tempaddr[id] = m.Type
+		tempaddr[id] = m.NodeIP //FIXED IT! :D
 		tempmsg := message{}
 		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
 		replicate(repstate)
 
-		time.Sleep(time.Second * 2)
-
 		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
+
+		time.Sleep(time.Second * 2)
 		for k, v := range mynode.testqueue[id] {
 			if v {
 				aggregate := mynode.tempmodel[k]
