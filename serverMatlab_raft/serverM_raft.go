@@ -576,6 +576,9 @@ func parseArgs() {
 	getNodeAddr(inputargs[1])
 	temp, _ := strconv.ParseInt(inputargs[2], 10, 64)
 	nID = int(temp)
+	fmt.Println("*********************************")
+	fmt.Println(nodestr)
+	fmt.Println("*********************************")
 }
 
 func getNodeAddr(slavefile string) {
