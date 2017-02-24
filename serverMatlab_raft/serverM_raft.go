@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 2
+const hb = 5
 
 var (
 	naddr   map[int]string
