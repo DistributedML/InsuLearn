@@ -561,10 +561,10 @@ func parseArgs() {
 	}
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[0])
 	checkError(err)
+	logger = govec.Initialize(inputargs[3], inputargs[3])
 	getNodeAddr(inputargs[1])
 	temp, _ := strconv.ParseInt(inputargs[2], 10, 64)
 	nID = int(temp)
-	logger = govec.Initialize(inputargs[3], inputargs[3])
 }
 
 func getNodeAddr(slavefile string) {
