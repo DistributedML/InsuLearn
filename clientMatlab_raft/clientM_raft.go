@@ -81,10 +81,12 @@ func main() {
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
-		if committed && (rand.Float64() < (1.0 / 150.0)) {
-			//isrunning = false
-		}
+		//if committed && (rand.Float64() < (1.0 / 150.0)) {
+		//	//isrunning = false
+		//}
 	}
+	//for connected > 0 {
+	//}
 
 }
 
