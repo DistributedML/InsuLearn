@@ -280,7 +280,7 @@ func main() {
 	//go printLeader()
 
 	if nID == 1 {
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 5)
 		mynode.raft.Campaign(mynode.ctx)
 	}
 	//Hacky solution to the Matlab problem (Mathworks, please fix this!)
@@ -548,7 +548,7 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempmsg := message{}
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
 		replicate(repstate)
-
+		time.Sleep(time.Second * 1)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 		for _, v := range mynode.tempmodel {
 			sendTestRequest(m.NodeName, id, v.Cnum, v.Model)
@@ -565,7 +565,7 @@ func processJoin(m message, conn *net.TCPConn) {
 
 		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 
-		//time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 1)
 		for k, v := range mynode.testqueue[id] {
 			if v {
 				aggregate := mynode.tempmodel[k]

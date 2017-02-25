@@ -179,7 +179,7 @@ func (n *node) process(entry raftpb.Entry) {
 		}
 		for k, v := range repstate.Client {
 			mynode.client[k] = v
-			fmt.Println("Committed client:", mynode.client)
+			//fmt.Println("Committed client:", mynode.client)
 		}
 		for k, v := range repstate.Tempmodel {
 			mynode.tempmodel[k] = v
