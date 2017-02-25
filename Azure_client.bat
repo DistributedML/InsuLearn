@@ -14,6 +14,7 @@ go build -o %DBPATH%\clientbayes.exe %DBPATH%\clientMatlab\client_azure.go
 :loop
 timeout 10
 %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log 1
+goto loop
 
 rem %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log 0
 rem :loop
