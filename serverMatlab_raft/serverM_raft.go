@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 5
+const hb = 1
 
 var (
 	naddr   map[int]string
@@ -106,7 +106,7 @@ func newNode(id uint64, peers []raft.Peer) *node {
 		cfg: &raft.Config{
 			ID:              id,
 			ElectionTick:    10 * hb,
-			HeartbeatTick:   2 * hb,
+			HeartbeatTick:   1 * hb,
 			Storage:         store,
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
@@ -204,7 +204,7 @@ func (n *node) process(entry raftpb.Entry) {
 		}
 		for k, v := range repstate.Client {
 			mynode.client[k] = v
-			fmt.Println("Committed client:", mynode.client)
+			//fmt.Println("Committed client:", mynode.client)
 		}
 		for k, v := range repstate.Tempmodel {
 			mynode.tempmodel[k] = v
@@ -395,7 +395,7 @@ func updateGlobal(ch chan message) {
 			modelR[id] = tempAggregate.R
 			modelC[id] = tempAggregate.C
 			t := time.Now()
-			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v for commit number: %v", t.Format("15:04:05:00"), id, tempAggregate.Cnum))
+			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v by %v at partial commit %v.", t.Format("15:04:05.0000"), id, client[m.NodeName], tempAggregate.d/modelD*100.0))
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.Cnum)
 		}
 	}
@@ -468,7 +468,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	tempmsg := message{}
 	repstate := state{0, 0, tempcnum, tempcnumhist, nil, temptempmodel, temptestqueue, nil, tempmsg}
 	flag := replicate(repstate)
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 2) //TODO check this!
 
 	if flag {
 		enc.Encode(response{"OK", ""})

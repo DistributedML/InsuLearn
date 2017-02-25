@@ -77,7 +77,7 @@ func main() {
 	time.Sleep(time.Duration(5 * time.Second))
 	//Main function of this server
 	for isrunning {
-		time.Sleep(time.Duration(2 * time.Second))
+		time.Sleep(time.Duration(5 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
@@ -197,6 +197,7 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
+	time.Sleep(2 * time.Seconds)
 	istesting--
 	fmt.Printf("Enter command: ")
 }
