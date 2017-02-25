@@ -82,16 +82,19 @@ func main() {
 		}
 	}
 	for connected > 0 {
+		time.Sleep(time.Duration(1 * time.Second))
 	}
 
 }
 
 func listener() {
 	for {
-		conn, err := l.AcceptTCP()
-		checkError(err)
-		connected++
-		go connHandler(conn)
+		if isrunning {
+			conn, err := l.AcceptTCP()
+			checkError(err)
+			connected++
+			go connHandler(conn)
+		}
 	}
 }
 
