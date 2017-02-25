@@ -418,15 +418,16 @@ func replicate(m state) bool {
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(m)
 	err = mynode.raft.Propose(mynode.ctx, buf.Bytes())
-	fmt.Println("Before: ", mynode.propID[repstate.PropID])
+	fmt.Println("Before: ", mynode.propID[r])
 
 	if err == nil {
 		//block and check the status of the proposal
 		for !flag {
-			fmt.Println("Hope: ", mynode.propID[repstate.PropID])
+			fmt.Println("Hope: ", mynode.propID[r])
 			time.Sleep(time.Duration(1 * time.Second))
 			if mynode.propID[r] {
 				flag = true
+				fmt.Println("YAY!")
 			}
 		}
 	}
