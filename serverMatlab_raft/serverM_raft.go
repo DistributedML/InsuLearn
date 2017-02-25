@@ -474,7 +474,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	time.Sleep(time.Second * 2) //TODO check this!
 
 	if flag {
-		for !mynode.testqueue[tempcnumhist[tempcnum]][id] {
+		for !mynode.cnumhist[tempcnum] != mynode.client[m.NodeName] {
 			//spin for queue to update, this is a double check on replication stage.
 		}
 		enc.Encode(response{"OK", ""})
@@ -555,7 +555,7 @@ func processJoin(m message, conn *net.TCPConn) {
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
 		flag := replicate(repstate)
 		if flag {
-			for mynode.addr[id] != m.NodeIp {
+			for mynode.claddr[id] != m.NodeIp {
 				//spin!
 			}
 		}
@@ -574,7 +574,7 @@ func processJoin(m message, conn *net.TCPConn) {
 		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
 		flag := replicate(repstate)
 		if flag {
-			for mynode.addr[id] != m.NodeIp {
+			for mynode.claddr[id] != m.NodeIp {
 				//spin!
 			}
 		}
