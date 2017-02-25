@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 3
+const hb = 5
 
 var (
 	naddr   map[int]string
@@ -224,6 +224,7 @@ func (n *node) process(entry raftpb.Entry) {
 			//fmt.Println("Committed testqueue:", mynode.testqueue)
 		}
 		mynode.propID[repstate.PropID] = true
+		fmt.Println("After: ", mynode.propID[repstate.PropID])
 		if repstate.Msg.Type != "" {
 			//fmt.Println("message :", repstate.Msg)
 			channel <- repstate.Msg
@@ -278,7 +279,7 @@ func main() {
 	//go printLeader()
 
 	if nID == 1 {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Duration(5 * time.Second))
 		mynode.raft.Campaign(mynode.ctx)
 	}
 	//Hacky solution to the Matlab problem (Mathworks, please fix this!)
@@ -303,7 +304,7 @@ func main() {
 
 func printLeader() {
 	for {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Duration(5 * time.Second))
 		sts := mynode.raft.Status()
 		fmt.Println(sts.Lead)
 	}
@@ -417,10 +418,13 @@ func replicate(m state) bool {
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(m)
 	err = mynode.raft.Propose(mynode.ctx, buf.Bytes())
+	fmt.Println("Before: ", mynode.propID[repstate.PropID])
 
 	if err == nil {
 		//block and check the status of the proposal
 		for !flag {
+			fmt.Println("Hope: ", mynode.propID[repstate.PropID])
+			time.Sleep(time.Duration(1 * time.Second))
 			if mynode.propID[r] {
 				flag = true
 			}
@@ -563,7 +567,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 		//		//spin!
 		//	}
 		//}
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Duration(2 * time.Second))
 		if flag {
 			fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 			for _, v := range mynode.tempmodel {
@@ -587,7 +591,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 		if flag {
 			fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Duration(2 * time.Second))
 			for k, v := range mynode.testqueue[id] {
 				if v {
 					aggregate := mynode.tempmodel[k]
