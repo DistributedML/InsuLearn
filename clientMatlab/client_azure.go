@@ -82,8 +82,9 @@ func main() {
 		}
 	}
 	for connected > 0 {
-		time.Sleep(time.Duration(1 * time.Second))
+		//time.Sleep(time.Duration(1 * time.Second))
 	}
+	l.Close()
 
 }
 
@@ -94,6 +95,7 @@ func listener() {
 			checkError(err)
 			connected++
 			go connHandler(conn)
+			defer conn.Close()
 		}
 	}
 }
