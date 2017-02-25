@@ -72,19 +72,26 @@ func main() {
 	}
 
 	//Main function of this server
-	for isrunning {
-		time.Sleep(time.Duration(2 * time.Second))
-		if !committed && (istesting == 0) {
-			requestCommit()
-		}
-		if committed && (rand.Float64() < (1.0 / 150.0)) {
-			isrunning = false
+	for {
+		if isrunning {
+			time.Sleep(time.Duration(2 * time.Second))
+			if !committed && (istesting == 0) {
+				requestCommit()
+			}
+			if committed && (rand.Float64() < (1.0 / 10.0)) {
+				isrunning = false
+			}
+		} else {
+			for connected > 0 {
+			}
+			time.Sleep(time.Duration(60 * time.Second))
+			isjoining = true
+			for isjoining {
+				requestJoin()
+			}
+			isrunning = true
 		}
 	}
-	for connected > 0 {
-		//time.Sleep(time.Duration(1 * time.Second))
-	}
-	l.Close()
 
 }
 
@@ -95,7 +102,6 @@ func listener() {
 			checkError(err)
 			connected++
 			go connHandler(conn)
-			defer conn.Close()
 		}
 	}
 }
