@@ -29,6 +29,7 @@ var (
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
 	committed bool = false
+	isrunning bool = true
 	isjoining bool
 	istesting int = 0
 	connected int = 0
