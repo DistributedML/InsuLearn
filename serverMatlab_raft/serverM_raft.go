@@ -474,8 +474,8 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	time.Sleep(time.Second * 2) //TODO check this!
 
 	if flag {
-		for mynode.cnum != tempcnum {
-			//loop until cnum is updated
+		for !mynode.testqueue[tempcnumhist[tempcnum]][id] {
+			//spin for queue to update, this is a double check on replication stage.
 		}
 		enc.Encode(response{"OK", ""})
 		conn.Close()
@@ -487,7 +487,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	} else {
 		enc.Encode(response{"NO", "Try Again!"})
 		conn.Close()
-		fmt.Printf("--> Denied commit request from %v.\n", m.NodeName)
+		fmt.Printf("--> Failed to commit request from %v.\n", m.NodeName)
 	}
 }
 
@@ -553,7 +553,12 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempaddr[id] = m.NodeIp
 		tempmsg := message{}
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
-		replicate(repstate)
+		flag := replicate(repstate)
+		if flag {
+			for mynode.addr[id] != m.NodeIp {
+				//spin!
+			}
+		}
 		time.Sleep(time.Second * 1)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 		for _, v := range mynode.tempmodel {
@@ -567,8 +572,12 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempaddr[id] = m.NodeIp //FIXED IT! :D
 		tempmsg := message{}
 		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
-		replicate(repstate)
-
+		flag := replicate(repstate)
+		if flag {
+			for mynode.addr[id] != m.NodeIp {
+				//spin!
+			}
+		}
 		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 
 		time.Sleep(time.Second * 1)
