@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"math"
-	//"math/rand"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -43,7 +43,7 @@ type node struct {
 	store     *raft.MemoryStorage
 	cfg       *raft.Config
 	raft      raft.Node
-	propID    int
+	propID    map[int]bool
 	maxnode   int
 	cnum      int
 	cnumhist  map[int]int
@@ -111,7 +111,7 @@ func newNode(id uint64, peers []raft.Peer) *node {
 			MaxSizePerMsg:   math.MaxUint16,
 			MaxInflightMsgs: 1024,
 		},
-		propID:    0,
+		propID:    make(map[int]bool),
 		maxnode:   0,
 		cnum:      0,
 		client:    make(map[string]int),
@@ -189,9 +189,6 @@ func (n *node) process(entry raftpb.Entry) {
 		dec := gob.NewDecoder(&buf)
 		buf.Write(entry.Data)
 		dec.Decode(&repstate)
-		//logger.UnpackReceive("got propose", entry.Data, &repstate)
-		//repstate = entry.Data
-		mynode.propID++
 		if repstate.Cnum > mynode.cnum {
 			mynode.cnum = repstate.Cnum
 		}
@@ -226,6 +223,7 @@ func (n *node) process(entry raftpb.Entry) {
 			}
 			//fmt.Println("Committed testqueue:", mynode.testqueue)
 		}
+		mynode.propID[repstate.PropID] = true
 		if repstate.Msg.Type != "" {
 			//fmt.Println("message :", repstate.Msg)
 			channel <- repstate.Msg
@@ -360,9 +358,9 @@ func connHandler(conn *net.TCPConn) {
 		flag := replicate(repstate)
 
 		if flag {
-			for mynode.testqueue[mynode.client[msg.NodeName]][mynode.cnumhist[msg.Id]] {
-				//spin for queue to update, this is a double check on replication stage.
-			}
+			//for mynode.testqueue[mynode.client[msg.NodeName]][mynode.cnumhist[msg.Id]] {
+			//	//spin for queue to update, this is a double check on replication stage.
+			//}
 			enc.Encode(response{"OK", ""})
 		} else {
 			enc.Encode(response{"NO", "Try Again"})
@@ -370,8 +368,13 @@ func connHandler(conn *net.TCPConn) {
 		}
 		conn.Close()
 	case "join_request":
-		enc.Encode(response{"OK", "Joined"})
-		processJoin(msg, conn)
+		flag := processJoin(msg, conn)
+		if flag {
+			enc.Encode(response{"OK", "Joined"})
+		} else {
+			enc.Encode(response{"NO", "Failed Join"})
+			conn.Close()
+		}
 	default:
 		fmt.Printf("something weird happened!\n")
 		enc.Encode(response{"NO", "Unknown Request"})
@@ -407,8 +410,8 @@ func updateGlobal(ch chan message) {
 func replicate(m state) bool {
 	flag := false
 
-	//r := rand.Intn(999999999999)
-	m.PropID = mynode.propID + 1
+	r := rand.Intn(999999999999)
+	m.PropID = r
 	var buf bytes.Buffer
 	//buf := logger.PrepareSend("packing to servers", m)
 	enc := gob.NewEncoder(&buf)
@@ -418,7 +421,7 @@ func replicate(m state) bool {
 	if err == nil {
 		//block and check the status of the proposal
 		for !flag {
-			if mynode.propID < m.PropID {
+			if mynode.propID[r] {
 				flag = true
 			}
 		}
@@ -474,9 +477,9 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	time.Sleep(time.Second * 2) //TODO check this!
 
 	if flag {
-		for mynode.cnumhist[tempcnum] != mynode.client[m.NodeName] {
-			//spin for queue to update, this is a double check on replication stage.
-		}
+		//for mynode.cnumhist[tempcnum] != mynode.client[m.NodeName] {
+		//	//spin for queue to update, this is a double check on replication stage.
+		//}
 		enc.Encode(response{"OK", ""})
 		conn.Close()
 		for name, id := range mynode.client {
@@ -538,10 +541,11 @@ func checkQueue(id int) bool {
 	return flag
 }
 
-func processJoin(m message, conn *net.TCPConn) {
+func processJoin(m message, conn *net.TCPConn) bool {
 	//process depending on if it is a new node or a returning one
 	tempaddr := make(map[int]string)
 	tempclient := make(map[string]int)
+	flag := false
 
 	if _, ok := mynode.client[m.NodeName]; !ok {
 		//adding a node that has never been added before
@@ -553,16 +557,18 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempaddr[id] = m.NodeIp
 		tempmsg := message{}
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
-		replicate(repstate)
+		flag = replicate(repstate) //TODO FIX
 		//if flag {
 		//	for mynode.client[m.NodeName] != id {
 		//		//spin!
 		//	}
 		//}
 		time.Sleep(time.Second * 1)
-		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
-		for _, v := range mynode.tempmodel {
-			sendTestRequest(m.NodeName, id, v.Cnum, v.Model)
+		if flag {
+			fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
+			for _, v := range mynode.tempmodel {
+				sendTestRequest(m.NodeName, id, v.Cnum, v.Model)
+			}
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
@@ -572,22 +578,25 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempaddr[id] = m.NodeIp //FIXED IT! :D
 		tempmsg := message{}
 		repstate := state{0, 0, 0, nil, nil, nil, nil, tempaddr, tempmsg}
-		replicate(repstate)
+		flag = replicate(repstate) //TODO FIX
 		//if flag {
 		//	for mynode.claddr[id] != m.NodeIp {
 		//		//spin!
 		//	}
 		//}
-		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
+		if flag {
+			fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 
-		time.Sleep(time.Second * 1)
-		for k, v := range mynode.testqueue[id] {
-			if v {
-				aggregate := mynode.tempmodel[k]
-				sendTestRequest(m.NodeName, id, aggregate.Cnum, aggregate.Model)
+			time.Sleep(time.Second * 1)
+			for k, v := range mynode.testqueue[id] {
+				if v {
+					aggregate := mynode.tempmodel[k]
+					sendTestRequest(m.NodeName, id, aggregate.Cnum, aggregate.Model)
+				}
 			}
 		}
 	}
+	return flag
 }
 
 func parseArgs() {
