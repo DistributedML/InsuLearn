@@ -23,6 +23,7 @@ import (
 const hb = 5
 
 var (
+	cnum    int = 0
 	naddr   map[int]string
 	logger  *govec.GoLog
 	nID     int
@@ -189,9 +190,9 @@ func (n *node) process(entry raftpb.Entry) {
 		dec := gob.NewDecoder(&buf)
 		buf.Write(entry.Data)
 		dec.Decode(&repstate)
-		if repstate.Cnum > mynode.cnum {
-			mynode.cnum = repstate.Cnum
-		}
+		//if repstate.Cnum > mynode.cnum {
+		//	mynode.cnum = repstate.Cnum
+		//}
 		if repstate.Maxnode > mynode.maxnode {
 			mynode.maxnode = repstate.Maxnode
 		}
@@ -445,6 +446,8 @@ func genGlobalModel() {
 }
 
 func processTestRequest(m message, conn *net.TCPConn) {
+	cnum++
+	tempcnumloc := cnum
 	enc := gob.NewEncoder(conn)
 
 	//initialize new aggregate
@@ -461,7 +464,7 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	temptestqueue := make(map[int]map[int]bool)
 
 	//update replicate cnum
-	tempcnum := mynode.cnum + 1
+	tempcnum := (nID-1)*10000 + tempcnumloc
 
 	//update temp tempmodel and cnumhist
 	tempcnumhist[tempcnum] = mynode.client[m.NodeName]
