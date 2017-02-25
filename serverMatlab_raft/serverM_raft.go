@@ -553,7 +553,7 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempaddr[id] = m.NodeIp
 		tempmsg := message{}
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
-		flag := replicate(repstate)
+		replicate(repstate)
 		//if flag {
 		//	for mynode.client[m.NodeName] != id {
 		//		//spin!
