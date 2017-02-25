@@ -73,11 +73,11 @@ func main() {
 
 	//Main function of this server
 	for isrunning {
-		time.Sleep(time.Duration(5 * time.Second))
+		time.Sleep(time.Duration(2 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
-		if committed && (rand.Float64() < (1.0 / 5.0)) {
+		if committed && (rand.Float64() < (1.0 / 150.0)) {
 			isrunning = false
 		}
 	}
@@ -117,6 +117,7 @@ func connHandler(conn *net.TCPConn) {
 		enc.Encode(response{"NO", "Unknown Command"})
 	}
 	conn.Close()
+	connected--
 }
 
 func parseUserInput() {
@@ -198,6 +199,7 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 
 func tcpSend(msg message) {
 	conn, err := net.DialTCP("tcp", nil, svaddr)
+	connected++
 	checkError(err)
 	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
