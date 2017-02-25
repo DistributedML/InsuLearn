@@ -360,6 +360,9 @@ func connHandler(conn *net.TCPConn) {
 		flag := replicate(repstate)
 
 		if flag {
+			for mynode.testqueue[mynode.client[msg.NodeName]][mynode.cnumhist[msg.Id]] {
+				//spin for queue to update, this is a double check on replication stage.
+			}
 			enc.Encode(response{"OK", ""})
 		} else {
 			enc.Encode(response{"NO", "Try Again"})
@@ -404,8 +407,8 @@ func updateGlobal(ch chan message) {
 func replicate(m state) bool {
 	flag := false
 
-	r := rand.Intn(999999999999)
-	m.PropID = r
+	//r := rand.Intn(999999999999)
+	m.PropID = mynode.PropID + 1
 	var buf bytes.Buffer
 	//buf := logger.PrepareSend("packing to servers", m)
 	enc := gob.NewEncoder(&buf)
@@ -414,11 +417,11 @@ func replicate(m state) bool {
 
 	if err == nil {
 		//block and check the status of the proposal
-		//for !flag {
-		//	if mynode.propID == r {
-		flag = true
-		//	}
-		//}
+		for !flag {
+			if mynode.propID < m.PropID {
+				flag = true
+			}
+		}
 	}
 
 	return flag
@@ -471,6 +474,9 @@ func processTestRequest(m message, conn *net.TCPConn) {
 	time.Sleep(time.Second * 2) //TODO check this!
 
 	if flag {
+		for mynode.cnum != tempcnum {
+			//loop until cnum is updated
+		}
 		enc.Encode(response{"OK", ""})
 		conn.Close()
 		for name, id := range mynode.client {
