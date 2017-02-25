@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const hb = 1
+const hb = 3
 
 var (
 	naddr   map[int]string
@@ -191,7 +191,7 @@ func (n *node) process(entry raftpb.Entry) {
 		dec.Decode(&repstate)
 		//logger.UnpackReceive("got propose", entry.Data, &repstate)
 		//repstate = entry.Data
-		mynode.propID = repstate.PropID
+		mynode.propID++
 		if repstate.Cnum > mynode.cnum {
 			mynode.cnum = repstate.Cnum
 		}
@@ -554,11 +554,11 @@ func processJoin(m message, conn *net.TCPConn) {
 		tempmsg := message{}
 		repstate := state{0, tempmaxnode, 0, nil, tempclient, nil, nil, tempaddr, tempmsg}
 		flag := replicate(repstate)
-		if flag {
-			for mynode.client[m.NodeName] != id {
-				//spin!
-			}
-		}
+		//if flag {
+		//	for mynode.client[m.NodeName] != id {
+		//		//spin!
+		//	}
+		//}
 		time.Sleep(time.Second * 1)
 		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
 		for _, v := range mynode.tempmodel {
