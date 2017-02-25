@@ -12,7 +12,7 @@ import (
 	"golang.org/x/net/context"
 	"io/ioutil"
 	"math"
-	"math/rand"
+	//"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -408,7 +408,7 @@ func replicate(m state) bool {
 	flag := false
 
 	//r := rand.Intn(999999999999)
-	m.PropID = mynode.PropID + 1
+	m.PropID = mynode.propID + 1
 	var buf bytes.Buffer
 	//buf := logger.PrepareSend("packing to servers", m)
 	enc := gob.NewEncoder(&buf)
