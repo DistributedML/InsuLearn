@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/4180122/distbayes/distmlMatlab"
 	"github.com/arcaneiceman/GoVector/govec"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -27,9 +28,10 @@ var (
 	l         *net.TCPListener
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
-	committed bool
+	committed bool = false
 	isjoining bool
 	istesting int = 0
+	connected int = 0
 )
 
 type message struct {
@@ -68,22 +70,26 @@ func main() {
 		requestJoin()
 	}
 
-	committed = false
-
 	//Main function of this server
-	for {
-		//parseUserInput()
-		time.Sleep(time.Duration(1 * time.Second))
+	for isrunning {
+		time.Sleep(time.Duration(5 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
+		if committed && (rand.Float64() < (1.0 / 150.0)) {
+			isrunning = false
+		}
 	}
+	for connected > 0 {
+	}
+
 }
 
 func listener() {
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
+		connected++
 		go connHandler(conn)
 	}
 }
@@ -211,6 +217,7 @@ func tcpSend(msg message) {
 	} else {
 		fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 	}
+	connected--
 }
 
 func parseArgs() {
@@ -231,6 +238,9 @@ func parseArgs() {
 	Xt = "C:/work/src/github.com/4180122/distbayes/testdata/xv.txt"
 	Yt = "C:/work/src/github.com/4180122/distbayes/testdata/yv.txt"
 	logger = govec.Initialize(inputargs[0], inputargs[5])
+	if inputargs[6] == "1" {
+		committed = true
+	}
 }
 
 func checkError(err error) {
