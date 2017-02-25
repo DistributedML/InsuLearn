@@ -78,18 +78,19 @@ func main() {
 			if !committed && (istesting == 0) {
 				requestCommit()
 			}
-			if committed && (rand.Float64() < (1.0 / 10.0)) {
+			if committed && (rand.Float64() < (1.0 / 150.0)) {
 				isrunning = false
 			}
 		} else {
 			for connected > 0 {
 			}
-			time.Sleep(time.Duration(120 * time.Second))
-			isjoining = true
-			for isjoining {
-				requestJoin()
-			}
-			isrunning = true
+			//time.Sleep(time.Duration(10 * time.Second))
+			//isjoining = true
+			//for isjoining {
+			//	requestJoin()
+			//}
+			//isrunning = true
+			os.Exit(0)
 		}
 	}
 
@@ -211,29 +212,31 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 }
 
 func tcpSend(msg message) {
-	conn, err := net.DialTCP("tcp", nil, svaddr)
-	connected++
-	checkError(err)
-	enc := gob.NewEncoder(conn)
-	dec := gob.NewDecoder(conn)
-	err = enc.Encode(&msg)
-	checkError(err)
-	var r response
-	err = dec.Decode(&r)
-	checkError(err)
-	if r.Resp == "OK" {
-		fmt.Printf(" [OK]\n")
-		if r.Error == "Committed" {
-			committed = true
-		} else if r.Error == "Joined" {
-			isjoining = false
+	if isrunning {
+		conn, err := net.DialTCP("tcp", nil, svaddr)
+		connected++
+		checkError(err)
+		enc := gob.NewEncoder(conn)
+		dec := gob.NewDecoder(conn)
+		err = enc.Encode(&msg)
+		checkError(err)
+		var r response
+		err = dec.Decode(&r)
+		checkError(err)
+		if r.Resp == "OK" {
+			fmt.Printf(" [OK]\n")
+			if r.Error == "Committed" {
+				committed = true
+			} else if r.Error == "Joined" {
+				isjoining = false
+			}
+		} else if r.Resp == "NO" {
+			fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
+		} else {
+			fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 		}
-	} else if r.Resp == "NO" {
-		fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
-	} else {
-		fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
+		connected--
 	}
-	connected--
 }
 
 func parseArgs() {
