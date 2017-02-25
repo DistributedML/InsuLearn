@@ -84,7 +84,7 @@ func main() {
 		} else {
 			for connected > 0 {
 			}
-			time.Sleep(time.Duration(60 * time.Second))
+			time.Sleep(time.Duration(120 * time.Second))
 			isjoining = true
 			for isjoining {
 				requestJoin()
@@ -97,11 +97,13 @@ func main() {
 
 func listener() {
 	for {
+		conn, err := l.AcceptTCP()
+		checkError(err)
 		if isrunning {
-			conn, err := l.AcceptTCP()
-			checkError(err)
 			connected++
 			go connHandler(conn)
+		} else {
+			conn.Close()
 		}
 	}
 }
@@ -260,6 +262,6 @@ func parseArgs() {
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
+		//os.Exit(1)
 	}
 }
