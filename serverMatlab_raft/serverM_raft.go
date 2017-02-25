@@ -395,7 +395,7 @@ func updateGlobal(ch chan message) {
 			modelR[id] = tempAggregate.R
 			modelC[id] = tempAggregate.C
 			t := time.Now()
-			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v by %v at partial commit %v.", t.Format("15:04:05.0000"), id, client[m.NodeName], tempAggregate.d/modelD*100.0))
+			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v by %v at partial commit %v.", t.Format("15:04:05.0000"), id, mynode.client[m.NodeName], tempAggregate.D/modelD*100.0))
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.Cnum)
 		}
 	}

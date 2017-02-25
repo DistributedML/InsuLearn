@@ -197,7 +197,7 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
-	time.Sleep(2 * time.Seconds)
+	time.Sleep(time.Duration(2 * time.Second))
 	istesting--
 	fmt.Printf("Enter command: ")
 }
