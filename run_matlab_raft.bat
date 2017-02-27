@@ -4,12 +4,12 @@ rem cd %GOPATH%
 go build -o clientbayes.exe .\clientMatlab_raft\clientM_raft.go
 go build -o serverbayes.exe .\serverMatlab_raft\serverM_raft.go
 pause
-start cmd /c .\serverbayes.exe 127.0.0.1:2600 raftlist.txt 1 s1
+start cmd /K .\serverbayes.exe 127.0.0.1:2600 raftlist.txt 1 s1
 timeout 3
-start cmd /c .\serverbayes.exe 127.0.0.1:2601 raftlist.txt 2 s2
-start cmd /c .\serverbayes.exe 127.0.0.1:2602 raftlist.txt 3 s3
-start cmd /c .\serverbayes.exe 127.0.0.1:2603 raftlist.txt 4 s4
-start cmd /c .\serverbayes.exe 127.0.0.1:2604 raftlist.txt 5 s5
+start cmd /K .\serverbayes.exe 127.0.0.1:2601 raftlist.txt 2 s2
+start cmd /K .\serverbayes.exe 127.0.0.1:2602 raftlist.txt 3 s3
+start cmd /K .\serverbayes.exe 127.0.0.1:2603 raftlist.txt 4 s4
+start cmd /K .\serverbayes.exe 127.0.0.1:2604 raftlist.txt 5 s5
 rem timeout 5
 pause
 start cmd /K .\clientbayes.exe hospital1 127.0.0.1:2605 serverlist.txt %GOPATH%\src\github.com\4180122\distbayes\testdata\x1.txt %GOPATH%\src\github.com\4180122\distbayes\testdata\y1.txt h1 0&
