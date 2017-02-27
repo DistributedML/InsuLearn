@@ -497,7 +497,7 @@ func sendTestRequest(name string, id, tcnum int, tmodel distmlMatlab.MatModel) {
 	err := tcpSend(mynode.claddr[id], msg)
 	if err != nil {
 		fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
-		fmt.Println(id, munode.cnumhist[id])
+		fmt.Println(id, mynode.cnumhist[id])
 	}
 }
 
