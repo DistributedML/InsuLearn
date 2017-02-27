@@ -350,7 +350,7 @@ func connHandler(conn *net.TCPConn) {
 	case "join_request":
 		// node is requesting to join or rejoin
 		fmt.Printf("<-- Received join request from %v.\n", msg.NodeName)
-		flag := processJoin(msg)
+		flag := processJoin(msg, conn)
 		if flag {
 			enc.Encode(response{"OK", "Joined"})
 		} else {
