@@ -240,7 +240,7 @@ func (n *node) process(entry raftpb.Entry) {
 			//fmt.Println("Committed testqueue:", mynode.testqueue)
 		}
 		n.propID[repstate.PropID] = true
-		fmt.Println("After: ", n.propID[repstate.PropID])
+		//fmt.Println("After: ", n.propID[repstate.PropID])
 		//if repstate.Msg.Type != "" {
 		//	//fmt.Println("message :", repstate.Msg)
 		//	channel <- repstate.Msg
@@ -433,7 +433,7 @@ func replicate(m state) bool {
 	enc := gob.NewEncoder(&buf)
 	err := enc.Encode(m)
 	err = mynode.raft.Propose(mynode.ctx, buf.Bytes())
-	fmt.Println("Before: ", mynode.propID[r])
+	//fmt.Println("Before: ", mynode.propID[r])
 
 	if err == nil {
 		//block and check the status of the proposal
@@ -453,7 +453,7 @@ func genGlobalModel() {
 	modelRtemp := modelR
 	modelCtemp := modelC
 	modelDtemp := modelD
-	fmt.Println(modelR)
+	//fmt.Println(modelR)
 	gmodel = distmlMatlab.CompactGlobal(modelstemp, modelRtemp, modelCtemp, modelDtemp)
 }
 
@@ -497,6 +497,7 @@ func sendTestRequest(name string, id, tcnum int, tmodel distmlMatlab.MatModel) {
 	err := tcpSend(mynode.claddr[id], msg)
 	if err != nil {
 		fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
+		fmt.Println(id, munode.cnumhist[id])
 	}
 }
 
