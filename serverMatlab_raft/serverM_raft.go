@@ -322,7 +322,7 @@ func printLeader() {
 	for {
 		time.Sleep(time.Duration(5 * time.Second))
 		sts := mynode.raft.Status()
-		fmt.Println(sts.Lead)
+		fmt.Println(sts.Lead, mynode.client, mynode.cumhist)
 	}
 }
 
@@ -461,9 +461,7 @@ func genGlobalModel() {
 func processTestRequest(m message, conn *net.TCPConn) {
 	repstate := state{0, nil, nil, m}
 	flag := replicate(repstate)
-
 	enc := gob.NewEncoder(conn)
-
 	if flag {
 		m.Model.Weight = 0.0
 		m.Model.Size = 0.0
