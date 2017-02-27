@@ -191,13 +191,13 @@ func (n *node) process(entry raftpb.Entry) {
 		dec.Decode(&repstate)
 		msg := repstate.Msg
 		switch msg.Type {
-		case "process_join":
+		case "join_request":
 			id := n.maxnode
 			n.maxnode++
 			n.client[msg.NodeName] = id
 			n.claddr[id], _ = net.ResolveTCPAddr("tcp", msg.NodeIp)
 			fmt.Printf("--- Added %v as node%v.\n", msg.NodeName, id)
-		case "process_rejoin":
+		case "rejoin_request":
 			id := n.client[msg.NodeName]
 			n.claddr[id], _ = net.ResolveTCPAddr("tcp", msg.NodeIp)
 			fmt.Printf("--- %v at node%v is back online.\n", msg.NodeName, id)
@@ -557,7 +557,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
-		m.Type = "process_rejoin"
+		m.Type = "rejoin_request"
 		repstate := state{0, nil, nil, m}
 		flag = replicate(repstate) //TODO FIX
 		//if flag {
