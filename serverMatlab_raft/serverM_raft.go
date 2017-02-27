@@ -322,7 +322,7 @@ func printLeader() {
 	for {
 		time.Sleep(time.Duration(5 * time.Second))
 		sts := mynode.raft.Status()
-		fmt.Println(sts.Lead, mynode.client, mynode.cumhist)
+		fmt.Println(sts.Lead, mynode.client, mynode.cnumhist)
 	}
 }
 
