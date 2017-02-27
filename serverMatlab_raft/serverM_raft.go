@@ -218,6 +218,9 @@ func (n *node) process(entry raftpb.Entry) {
 					n.testqueue[id] = queue
 				}
 			}
+		case "test_complete":
+			n.testqueue[n.client[msg.NodeName]][n.cnumhist[msg.Id]] = false
+			channel <- msg
 		default:
 			//channel <- msg \\TODO: Fix this!
 		}
@@ -322,7 +325,7 @@ func printLeader() {
 	for {
 		time.Sleep(time.Duration(5 * time.Second))
 		sts := mynode.raft.Status()
-		fmt.Println(sts.Lead, mynode.client, mynode.cnumhist)
+		fmt.Println(sts.Lead, mynode.client)
 	}
 }
 
@@ -367,11 +370,12 @@ func connHandler(conn *net.TCPConn) {
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.NodeName)
 
 		//replication
-		temptestqueue := make(map[int]map[int]bool)
-		queue := make(map[int]bool)
-		queue[mynode.cnumhist[msg.Id]] = false
-		temptestqueue[mynode.client[msg.NodeName]] = queue
-		repstate := state{0, nil, temptestqueue, msg}
+		//temptestqueue := make(map[int]map[int]bool)
+		//queue := make(map[int]bool)
+		//queue[mynode.cnumhist[msg.Id]] = false
+		//temptestqueue[mynode.client[msg.NodeName]] = queue
+		//repstate := state{0, nil, temptestqueue, msg}
+		repstate := state{0, nil, nil, msg}
 		flag := replicate(repstate)
 
 		if flag {
