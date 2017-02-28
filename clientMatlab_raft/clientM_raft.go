@@ -87,7 +87,7 @@ func main() {
 			requestCommit()
 		}
 		if committed && (rand.Float64() < (1.0 / 30.0)) {
-			isrunning = false
+			//isrunning = false
 		}
 	}
 	//for connected > 0 {
