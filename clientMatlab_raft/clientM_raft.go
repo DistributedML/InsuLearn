@@ -16,9 +16,7 @@ import (
 )
 
 var (
-	cnum      int     = 0
-	modeldeg  int     = 2
-	modellam  float64 = 0.01
+	cnum      int = 0
 	name      string
 	inputargs []string
 	myaddr    *net.TCPAddr
@@ -81,17 +79,27 @@ func main() {
 
 	time.Sleep(time.Duration(5 * time.Second))
 	//Main function of this server
-	for isrunning {
-		time.Sleep(time.Duration(1 * time.Second))
-		if !committed && (istesting == 0) {
-			requestCommit()
-		}
-		if committed && (rand.Float64() < (1.0 / 30.0)) {
-			//isrunning = false
+	for {
+		if isrunning {
+			time.Sleep(time.Duration(2 * time.Second))
+			if !committed && (istesting == 0) {
+				requestCommit()
+			}
+			if committed && (rand.Float64() < (1.0 / 50.0)) {
+				isrunning = false
+			}
+		} else {
+			for connected > 0 {
+			}
+			//time.Sleep(time.Duration(10 * time.Second))
+			//isjoining = true
+			//for isjoining {
+			//	requestJoin()
+			//}
+			//isrunning = true
+			os.Exit(0)
 		}
 	}
-	//for connected > 0 {
-	//}
 
 }
 
@@ -204,43 +212,44 @@ func testModel(id int, testmodel distmlMatlab.MatModel) {
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
-	//time.Sleep(time.Duration(2 * time.Second))
 	istesting--
 	fmt.Printf("Enter command: ")
 }
 
 func tcpSend(msg message) {
-	var err error
-	var conn *net.TCPConn
-	for _, v := range svaddr {
-		conn, err = net.DialTCP("tcp", nil, v)
-		//checkError(err)
-		if err == nil {
-			break
+	if isrunning {
+		var err error
+		var conn *net.TCPConn
+		for _, v := range svaddr {
+			conn, err = net.DialTCP("tcp", nil, v)
+			if err == nil {
+				break
+			}
 		}
-	}
-	enc := gob.NewEncoder(conn)
-	dec := gob.NewDecoder(conn)
-
-	err = enc.Encode(&msg)
-	checkError(err)
-	var r response
-	err = dec.Decode(&r)
-	checkError(err)
-
-	if r.Resp == "OK" {
-		fmt.Printf(" [OK]\n")
-		if r.Error == "Committed" {
-			committed = true
-		} else if r.Error == "Joined" {
-			isjoining = false
+		enc := gob.NewEncoder(conn)
+		dec := gob.NewDecoder(conn)
+		err = enc.Encode(&msg)
+		checkError(err)
+		var r response
+		err = dec.Decode(&r)
+		checkError(err)
+		if r.Resp == "OK" {
+			fmt.Printf(" [OK]\n")
+			if r.Error == "Committed" {
+				committed = true
+			} else if r.Error == "Joined" {
+				isjoining = false
+			}
+		} else if r.Resp == "NO" {
+			fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
+			if r.Error == "Restart" {
+				requestJoin()
+			}
+		} else {
+			fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 		}
-	} else if r.Resp == "NO" {
-		fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
-	} else {
-		fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
+		connected--
 	}
-
 }
 
 func parseArgs() {

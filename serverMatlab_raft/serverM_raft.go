@@ -329,7 +329,7 @@ func connHandler(conn *net.TCPConn) {
 			processTestRequest(msg, conn)
 		} else {
 			// deny commit request
-			enc.Encode(response{"NO", "Pending tests are not complete."})
+			enc.Encode(response{"NO", "Restart"})
 			fmt.Printf("--> Denied commit request from %v.\n", msg.NodeName)
 			conn.Close()
 		}
