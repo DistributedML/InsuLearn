@@ -13,7 +13,7 @@ go build -o %DBPATH%\clientbayes.exe %DBPATH%\clientMatlab_raft\clientM_raft.go
 rem go build -o %DBPATH%\clientbayes.exe %DBPATH%\clientMatlab\client_azure.go
 
 %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log 0
-:loop
-timeout 10
-%DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log 1
-goto loop
+rem :loop
+rem timeout 10
+rem %DBPATH%\clientbayes.exe %LOCALADD% %LOCALADD%:12456 %SERVERADD% %XDATA% %YDATA% log 1
+rem goto loop

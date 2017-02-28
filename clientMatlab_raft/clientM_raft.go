@@ -86,7 +86,7 @@ func main() {
 				requestCommit()
 			}
 			if committed && (rand.Float64() < (1.0 / 50.0)) {
-				isrunning = false
+				//isrunning = false
 			}
 		} else {
 			for connected > 0 {
@@ -97,7 +97,7 @@ func main() {
 			//	requestJoin()
 			//}
 			//isrunning = true
-			os.Exit(0)
+			//os.Exit(0)
 		}
 	}
 

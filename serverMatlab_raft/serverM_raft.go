@@ -199,7 +199,7 @@ func (n *node) process(entry raftpb.Entry) {
 				queue[k] = true
 			}
 			n.testqueue[id] = queue
-			fmt.Println(mynode.testqueue[id])
+			fmt.Println(n.testqueue[id])
 			fmt.Printf("--- Added %v as node%v.\n", msg.NodeName, id)
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
@@ -213,7 +213,7 @@ func (n *node) process(entry raftpb.Entry) {
 			tempweight := make(map[int]float64)
 			r := msg.Model.Weight
 			c := msg.Model.Size
-			tempweight[mynode.client[msg.NodeName]] = r
+			tempweight[n.client[msg.NodeName]] = r
 			n.tempmodel[n.client[msg.NodeName]] = aggregate{tempcnum, msg.Model, tempweight, c, c}
 			for _, id := range n.client {
 				if id != n.client[msg.NodeName] {
