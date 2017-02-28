@@ -74,6 +74,11 @@ func main() {
 		requestJoin()
 	}
 
+	//time.Sleep(time.Duration(rand.Float64()) * time.Second)
+	//for {
+	//	parseuserinput()
+	//}
+
 	time.Sleep(time.Duration(5 * time.Second))
 	//Main function of this server
 	for isrunning {
@@ -126,7 +131,7 @@ func connHandler(conn *net.TCPConn) {
 	connected--
 }
 
-func parseUserInput() {
+func parseuserinput() {
 	var ident string
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter command: ")
