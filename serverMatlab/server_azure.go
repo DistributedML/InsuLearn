@@ -54,7 +54,7 @@ type response struct {
 }
 
 func main() {
-	//Initialize stuff
+	//Initialize
 	client = make(map[string]int)
 	claddr = make(map[int]*net.TCPAddr)
 	models = make(map[int]distmlMatlab.MatModel)

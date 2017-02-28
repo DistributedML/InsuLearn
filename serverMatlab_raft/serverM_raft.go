@@ -194,6 +194,11 @@ func (n *node) process(entry raftpb.Entry) {
 			n.maxnode++
 			n.client[msg.NodeName] = id
 			n.claddr[id], _ = net.ResolveTCPAddr("tcp", msg.NodeIp)
+			queue := make(map[int]bool)
+			for k, _ := range n.tempmodel {
+				queue[k] = true
+			}
+			n.testqueue[id] = queue
 			fmt.Printf("--- Added %v as node%v.\n", msg.NodeName, id)
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
