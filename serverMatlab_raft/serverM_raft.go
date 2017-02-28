@@ -199,7 +199,7 @@ func (n *node) process(entry raftpb.Entry) {
 				queue[k] = true
 			}
 			n.testqueue[id] = queue
-			fmt.Println(testqueue[id])
+			fmt.Println(mynode.testqueue[id])
 			fmt.Printf("--- Added %v as node%v.\n", msg.NodeName, id)
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
