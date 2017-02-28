@@ -343,8 +343,10 @@ func connHandler(conn *net.TCPConn) {
 	case "test_complete":
 		// node is submitting test results, update testqueue on all replicas
 		fmt.Printf("<-- Received completed test results from %v.\n", msg.NodeName)
-		repstate := state{0, msg}
-		flag := replicate(repstate)
+		if mynode.testqueue[mynode.client[msg.NodeName]][mynode.cnumhist[msg.Id]] {
+			repstate := state{0, msg}
+			flag := replicate(repstate)
+		}
 		if flag {
 			enc.Encode(response{"OK", "Test Processed"})
 		} else {
