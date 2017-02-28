@@ -94,8 +94,10 @@ func listener() {
 	for {
 		conn, err := l.AcceptTCP()
 		//checkError(err)
-		connected++
-		go connHandler(conn)
+		if err == nil {
+			connected++
+			go connHandler(conn)
+		}
 	}
 }
 
