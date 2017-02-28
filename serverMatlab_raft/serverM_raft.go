@@ -199,6 +199,7 @@ func (n *node) process(entry raftpb.Entry) {
 				queue[k] = true
 			}
 			n.testqueue[id] = queue
+			fmt.Println(testqueue[id])
 			fmt.Printf("--- Added %v as node%v.\n", msg.NodeName, id)
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
@@ -535,6 +536,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 				if v {
 					aggregate := mynode.tempmodel[k]
 					sendTestRequest(m.NodeName, id, aggregate.Cnum, aggregate.Model)
+					fmt.Println("########## It's working")
 				}
 			}
 		}
