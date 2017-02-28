@@ -204,7 +204,7 @@ func (n *node) process(entry raftpb.Entry) {
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
 			n.claddr[id], _ = net.ResolveTCPAddr("tcp", msg.NodeIp)
-			fmt.Printf("###########--- %v at node%v is back online.\n", msg.NodeName, id)
+			fmt.Println(n.testqueue[id])
 		case "commit_request":
 			tempcnum := n.cnum
 			n.cnum++
@@ -536,7 +536,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 				if v {
 					aggregate := mynode.tempmodel[k]
 					sendTestRequest(m.NodeName, id, aggregate.Cnum, aggregate.Model)
-					fmt.Println("########## It's working")
+					fmt.Println("########## It's working", mynode.testqueue[id])
 				}
 			}
 		}
