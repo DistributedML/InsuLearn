@@ -243,6 +243,7 @@ func tcpSend(msg message) {
 		} else if r.Resp == "NO" {
 			fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
 			if r.Error == "Restart" {
+				time.Sleep(time.Duration(5 * time.Second))
 				requestJoin()
 			}
 		} else {
