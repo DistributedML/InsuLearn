@@ -77,12 +77,12 @@ func main() {
 	time.Sleep(time.Duration(5 * time.Second))
 	//Main function of this server
 	for isrunning {
-		time.Sleep(time.Duration(5 * time.Second))
+		time.Sleep(time.Duration(1 * time.Second))
 		if !committed && (istesting == 0) {
 			requestCommit()
 		}
-		if committed && (rand.Float64() < (1.0 / 150.0)) {
-			//	//isrunning = false
+		if committed && (rand.Float64() < (1.0 / 30.0)) {
+			isrunning = false
 		}
 	}
 	//for connected > 0 {
@@ -93,7 +93,7 @@ func main() {
 func listener() {
 	for {
 		conn, err := l.AcceptTCP()
-		checkError(err)
+		//checkError(err)
 		connected++
 		go connHandler(conn)
 	}
@@ -207,7 +207,7 @@ func tcpSend(msg message) {
 	var conn *net.TCPConn
 	for _, v := range svaddr {
 		conn, err = net.DialTCP("tcp", nil, v)
-		checkError(err)
+		//checkError(err)
 		if err == nil {
 			break
 		}
@@ -249,7 +249,6 @@ func parseArgs() {
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[1])
 	checkError(err)
 	getNodeAddr(inputargs[2])
-	checkError(err)
 	X = inputargs[3]
 	Y = inputargs[4]
 	Xt = "C:/work/src/github.com/4180122/distbayes/testdata/xv.txt"
