@@ -203,7 +203,7 @@ func (n *node) process(entry raftpb.Entry) {
 		case "rejoin_request":
 			id := n.client[msg.NodeName]
 			n.claddr[id], _ = net.ResolveTCPAddr("tcp", msg.NodeIp)
-			fmt.Printf("--- %v at node%v is back online.\n", msg.NodeName, id)
+			fmt.Printf("###########--- %v at node%v is back online.\n", msg.NodeName, id)
 		case "commit_request":
 			tempcnum := n.cnum
 			n.cnum++
@@ -530,7 +530,7 @@ func processJoin(m message, conn *net.TCPConn) bool {
 		repstate := state{0, m}
 		flag = replicate(repstate)
 		if flag {
-			time.Sleep(time.Duration(2 * time.Second))
+			//time.Sleep(time.Duration(2 * time.Second))
 			for k, v := range mynode.testqueue[id] {
 				if v {
 					aggregate := mynode.tempmodel[k]
@@ -573,6 +573,6 @@ func getNodeAddr(slavefile string) {
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
+		//os.Exit(1)
 	}
 }
