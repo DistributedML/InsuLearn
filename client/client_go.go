@@ -1,10 +1,10 @@
 package main
 
 import (
+	"../bclass"
 	"bufio"
 	"flag"
 	"fmt"
-	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
 	"github.com/gonum/matrix/mat64"
 	"io/ioutil"
@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+const BUFFSIZE = 1048576
 
 var (
 	cnum      int     = 0
@@ -31,17 +33,18 @@ var (
 	l         *net.TCPListener
 	gmodel    bclass.GlobalModel
 	gempty    bclass.GlobalModel
+	isjoining bool = true
 )
 
 type message struct {
-	Id     int
-	Ip     string
-	Name   string
-	Type   string
-	C      int
-	D      int
-	Model  bclass.Model
-	GModel bclass.GlobalModel
+	Id       int
+	NodeIp   string
+	NodeName string
+	Type     string
+	C        int
+	D        int
+	Model    bclass.Model
+	GModel   bclass.GlobalModel
 }
 
 func main() {
@@ -55,7 +58,10 @@ func main() {
 	l, _ = net.ListenTCP("tcp", myaddr)
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
-	requestJoin()
+
+	for isjoining {
+		requestJoin()
+	}
 
 	//Main function of this server
 	for {
@@ -67,12 +73,14 @@ func listener() {
 	for {
 		conn, err := l.AcceptTCP()
 		checkError(err)
-		go connHandler(conn)
+		if err == nil {
+			go connHandler(conn)
+		}
 	}
 }
 
 func connHandler(conn *net.TCPConn) {
-	p := make([]byte, 1048576)
+	p := make([]byte, BUFFSIZE)
 	conn.Read(p)
 	var msg message
 	logger.UnpackReceive("Received message", p, &msg)
@@ -86,10 +94,9 @@ func connHandler(conn *net.TCPConn) {
 		conn.Write([]byte("OK"))
 		gmodel = msg.GModel
 		fmt.Printf("\n <-- Pulled global model from server.\nEnter command: ")
-		//go testGlobal(msg.GModel)
 	default:
-		conn.Write([]byte("Unknown command."))
 		// respond to ping
+		conn.Write([]byte("Unknown command."))
 	}
 	conn.Close()
 }
@@ -150,6 +157,7 @@ func parseUserInput() {
 }
 
 func requestJoin() {
+	//msg := message{cnum, myaddr.String(), name, "join_request", 0, 0, model, gempty}
 	msg := message{cnum, myaddr.String(), name, "join_request", 0, 0, model, gempty}
 	fmt.Printf(" --> Asking server to join.")
 	tcpSend(msg)
@@ -179,17 +187,20 @@ func testModel(id int, testmodel bclass.Model) {
 }
 
 func tcpSend(msg message) {
-	p := make([]byte, 1024)
+	p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, svaddr)
 	checkError(err)
 	outbuf := logger.PrepareSend(msg.Type, msg)
 	_, err = conn.Write(outbuf)
 	checkError(err)
 	n, _ := conn.Read(p)
-	if string(p[:n]) != "OK" {
-		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
-	} else {
+	if string(p[:n]) == "OK" {
 		fmt.Printf(" [OK]\n")
+	} else if string(p[:n]) == "Joined" {
+		fmt.Printf(" [OK]\n")
+		isjoining = false
+	} else {
+		fmt.Printf(" [NO!]\n *** Request was denied by server: %v.\nEnter command: ", string(p[:n]))
 	}
 }
 
@@ -222,17 +233,16 @@ func parseArgs() {
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[1])
 	checkError(err)
 	svaddr, err = net.ResolveTCPAddr("tcp", inputargs[2])
-	checkError(err)
 	x = readData(inputargs[3])
 	y = readData(inputargs[4])
-	xt = readData("testdata/xv.txt")
-	yt = readData("testdata/yv.txt")
-	logger = govec.Initialize(inputargs[0], inputargs[5])
+	xt = readData(inputargs[5])
+	yt = readData(inputargs[6])
+	logger = govec.Initialize(inputargs[0], inputargs[7])
 }
 
 func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
-		os.Exit(1)
+		//os.Exit(1)
 	}
 }

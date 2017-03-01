@@ -30,9 +30,9 @@ var (
 	gempty    distmlMatlab.MatGlobalModel
 	committed bool = false
 	isrunning bool = true
-	isjoining bool
-	istesting int = 0
-	connected int = 0
+	isjoining bool = true
+	istesting int  = 0
+	connected int  = 0
 )
 
 type message struct {
@@ -66,7 +66,6 @@ func main() {
 	fmt.Printf("Node initialized as %v.\n", name)
 	go listener()
 
-	isjoining = true
 	for isjoining {
 		requestJoin()
 	}
@@ -232,6 +231,10 @@ func tcpSend(msg message) {
 			}
 		} else if r.Resp == "NO" {
 			fmt.Printf(" [%s]\n *** Request was denied by server: %v.\nEnter command: ", r.Resp, r.Error)
+			if r.Error == "Restart" {
+				time.Sleep(time.Duration(5 * time.Second))
+				requestJoin()
+			}
 		} else {
 			fmt.Printf(" [%s]\n *** Something strange Happened: %v.\nEnter command: ", r.Resp, r.Error)
 		}

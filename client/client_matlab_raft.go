@@ -7,8 +7,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/arcaneiceman/GoVector/govec"
+	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 )
 
 var (
@@ -16,7 +18,7 @@ var (
 	name      string
 	inputargs []string
 	myaddr    *net.TCPAddr
-	svaddr    *net.TCPAddr
+	svaddr    map[int]*net.TCPAddr
 	model     distmlMatlab.MatModel
 	logger    *govec.GoLog
 	X         string
@@ -27,7 +29,6 @@ var (
 	gmodel    distmlMatlab.MatGlobalModel
 	gempty    distmlMatlab.MatGlobalModel
 	isjoining bool = true
-	istesting int  = 0
 )
 
 type message struct {
@@ -65,9 +66,8 @@ func main() {
 		requestJoin()
 	}
 
-	//Main function of this server
 	for {
-		parseUserInput()
+		parseuserinput()
 	}
 
 }
@@ -75,8 +75,10 @@ func main() {
 func listener() {
 	for {
 		conn, err := l.AcceptTCP()
-		checkError(err)
-		go connHandler(conn)
+		//checkError(err)
+		if err == nil {
+			go connHandler(conn)
+		}
 	}
 }
 
@@ -104,7 +106,7 @@ func connHandler(conn *net.TCPConn) {
 	conn.Close()
 }
 
-func parseUserInput() {
+func parseuserinput() {
 	var ident string
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter command: ")
@@ -129,13 +131,13 @@ func parseUserInput() {
 		requestGlobal()
 	case "valid":
 		acc, _ := distmlMatlab.GetErrorGlobal(X, Y, gmodel)
-		fmt.Printf(" --- Global model error on local data is: %v.\n", acc)
+		fmt.Printf(" --- Global model accuracy on local data is: %v.\n", acc)
 	case "test":
 		acc := distmlMatlab.GetError(Xt, Yt, model)
 		fmt.Printf(" --- Local model error on test data is: %v.\n", acc)
 	case "testg":
 		acc, _ := distmlMatlab.GetErrorGlobal(Xt, Yt, gmodel)
-		fmt.Printf(" --- Global model error on test data is: %v.\n", acc)
+		fmt.Printf(" --- Global model accuracy on test data is: %v.\n", acc)
 	case "who":
 		fmt.Printf("%v\n", name)
 	default:
@@ -172,18 +174,22 @@ func requestGlobal() {
 
 func testModel(id int, testmodel distmlMatlab.MatModel) {
 	fmt.Printf("\n <-- Received test requset.\nEnter command: ")
-	istesting++
 	distmlMatlab.TestModel(X, Y, &testmodel)
 	msg := message{id, myaddr.String(), name, "test_complete", testmodel, gempty}
 	fmt.Printf("\n --> Sending completed test requset.")
 	tcpSend(msg)
-	istesting--
 	fmt.Printf("Enter command: ")
 }
 
 func tcpSend(msg message) {
-	conn, err := net.DialTCP("tcp", nil, svaddr)
-	checkError(err)
+	var err error
+	var conn *net.TCPConn
+	for _, v := range svaddr {
+		conn, err = net.DialTCP("tcp", nil, v)
+		if err == nil {
+			break
+		}
+	}
 	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
 	err = enc.Encode(&msg)
@@ -207,6 +213,7 @@ func parseArgs() {
 	flag.Parse()
 	inputargs = flag.Args()
 	var err error
+	svaddr = make(map[int]*net.TCPAddr)
 	if len(inputargs) < 2 {
 		fmt.Printf("Not enough inputs.\n")
 		return
@@ -214,13 +221,21 @@ func parseArgs() {
 	name = inputargs[0]
 	myaddr, err = net.ResolveTCPAddr("tcp", inputargs[1])
 	checkError(err)
-	svaddr, err = net.ResolveTCPAddr("tcp", inputargs[2])
-	checkError(err)
+	getNodeAddr(inputargs[2])
 	X = inputargs[3]
 	Y = inputargs[4]
 	Xt = inputargs[5]
 	Yt = inputargs[6]
 	logger = govec.Initialize(inputargs[0], inputargs[7])
+}
+
+func getNodeAddr(slavefile string) {
+	dat, err := ioutil.ReadFile(slavefile)
+	checkError(err)
+	nodestr := strings.Split(string(dat), " ")
+	for i := 0; i < len(nodestr)-1; i++ {
+		svaddr[i], _ = net.ResolveTCPAddr("tcp", nodestr[i])
+	}
 }
 
 func checkError(err error) {

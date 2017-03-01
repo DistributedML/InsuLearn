@@ -1,3 +1,4 @@
+:: Generating Shiviz-friendly outup from local logs
 set FILE=Shiviz.log
 echo ^(?^<host^>\S*^) ^(?^<clock^>{.*}^)\n(?^<event^>.*^)  > %FILE%
 echo. >> %FILE%

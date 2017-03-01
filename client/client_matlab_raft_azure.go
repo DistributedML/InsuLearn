@@ -97,7 +97,7 @@ func main() {
 			//	requestJoin()
 			//}
 			//isrunning = true
-			//os.Exit(0)
+			os.Exit(0)
 		}
 	}
 
@@ -106,10 +106,12 @@ func main() {
 func listener() {
 	for {
 		conn, err := l.AcceptTCP()
-		//checkError(err)
+		checkError(err)
 		if err == nil {
 			connected++
 			go connHandler(conn)
+		} else {
+			conn.Close()
 		}
 	}
 }

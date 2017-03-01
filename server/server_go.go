@@ -1,13 +1,16 @@
 package main
 
 import (
+	"../bclass"
 	"flag"
 	"fmt"
-	"github.com/4180122/distbayes/bclass"
 	"github.com/arcaneiceman/GoVector/govec"
 	"net"
 	"os"
+	"time"
 )
+
+const BUFFSIZE = 1048576
 
 var (
 	cnum      int = 0
@@ -36,14 +39,14 @@ type aggregate struct {
 }
 
 type message struct {
-	Id     int
-	Ip     string
-	Name   string
-	Type   string
-	C      int
-	D      int
-	Model  bclass.Model
-	GModel bclass.GlobalModel
+	Id       int
+	NodeIp   string
+	NodeName string
+	Type     string
+	C        int
+	D        int
+	Model    bclass.Model
+	GModel   bclass.GlobalModel
 }
 
 func main() {
@@ -76,47 +79,56 @@ func main() {
 
 }
 
+// Function for handling client requests
 func connHandler(conn *net.TCPConn) {
 	var msg message
-	p := make([]byte, 1048576)
+	p := make([]byte, BUFFSIZE)
 	conn.Read(p)
 	logger.UnpackReceive("Received message", p, &msg)
 	switch msg.Type {
 	case "commit_request":
-		//node is sending a model, must forward to others for testing
-		flag := checkQueue(client[msg.Name])
-		fmt.Printf("<-- Received commit request from %v.\n", msg.Name)
+		// node is sending a model, checking to see if testing is complete
+		flag := checkQueue(client[msg.NodeName])
+		fmt.Printf("<-- Received commit request from %v.\n", msg.NodeName)
 		if flag {
-			conn.Write([]byte("OK"))
-			conn.Close()
-			processTestRequest(msg)
+			// accept commit from node and process outgoing test requests
+			processTestRequest(msg, conn)
 		} else {
 			//denied
-			conn.Write([]byte("Pending tests are not complete."))
-			fmt.Printf("--> Denied commit request from %v.\n", msg.Name)
+			conn.Write([]byte("Pending tests are not complete"))
+			fmt.Printf("--> Denied commit request from %v.\n", msg.NodeName)
 			conn.Close()
 		}
 	case "global_request":
 		//node is requesting the global model, will forward
 		conn.Write([]byte("OK"))
-		fmt.Printf("<-- Received global model request from %v.\n", msg.Name)
+		fmt.Printf("<-- Received global model request from %v.\n", msg.NodeName)
+		genGlobalModel()
 		sendGlobal(msg)
 		conn.Close()
 	case "test_complete":
-		//node is submitting test results, will update its queue
-		conn.Write([]byte("OK"))
-		fmt.Printf("<-- Received completed test results from %v.\n", msg.Name)
-		testqueue[client[msg.Name]][cnumhist[msg.Id]] = false
-		conn.Close()
+		// node is submitting test results, update testqueue on all replicas
+		fmt.Printf("<-- Received completed test results from %v.\n", msg.NodeName)
 		//update the pending commit and merge if complete
-		channel <- msg
+		if testqueue[client[msg.NodeName]][cnumhist[msg.Id]] {
+			testqueue[client[msg.NodeName]][cnumhist[msg.Id]] = false
+			channel <- msg
+			conn.Write([]byte("OK"))
+		} else {
+			// if testqueue is already empty
+			conn.Write([]byte("Duplicate Test"))
+			fmt.Printf("--> Ignored test results from %v.\n", msg.NodeName)
+		}
+		conn.Close()
 	case "join_request":
-		conn.Write([]byte("OK"))
+		// node is requesting to join or rejoin
 		processJoin(msg)
+		conn.Write([]byte("Joined"))
 		conn.Close()
 	default:
-		fmt.Println("something weird happened!")
-		fmt.Println(msg)
+		conn.Write([]byte("Unknown Request"))
+		fmt.Printf("something weird happened!\n")
+		conn.Close()
 	}
 }
 
@@ -135,61 +147,80 @@ func updateGlobal(ch chan message) {
 		if float64(tempAggregate.d) > float64(modelD)*0.6 {
 			models[id] = tempAggregate.model
 			modelC[id] = tempAggregate.c
-			gmodel = bclass.GlobalModel{models, modelC, modelD}
-			logger.LogLocalEvent("commit_complete")
+			t := time.Now()
+			logger.LogLocalEvent(fmt.Sprintf("%s - Committed model%v by %v at partial commit %v.", t.Format("15:04:05.0000"), id, client[m.NodeName], tempAggregate.d/modelD*100.0))
+			//logger.LogLocalEvent("commit_complete")
 			fmt.Printf("--- Committed model%v for commit number: %v.\n", id, tempAggregate.cnum)
 		}
 	}
 }
 
-func processTestRequest(m message) {
+// Generate global model from partial commits
+func genGlobalModel() {
+	modelstemp := models
+	modelCtemp := modelC
+	modelDtemp := modelD
+	gmodel = bclass.GlobalModel{modelstemp, modelCtemp, modelDtemp}
+}
+
+// Function that generates test request following a commit request
+func processTestRequest(m message, conn *net.TCPConn) {
+	tempcnum := cnum
 	cnum++
+	cnumhist[tempcnum] = client[m.NodeName]
 	//initialize new aggregate
-	tempmodel[client[m.Name]] = aggregate{cnum, m.Model, m.C, m.D}
-	cnumhist[cnum] = client[m.Name]
+	tempmodel[client[m.NodeName]] = aggregate{tempcnum, m.Model, m.C, m.D}
+	for _, id := range client {
+		if id != client[m.NodeName] {
+			if queue, ok := testqueue[id]; !ok {
+				queue := make(map[int]bool)
+				queue[cnumhist[tempcnum]] = true
+				testqueue[id] = queue
+			} else {
+				queue[cnumhist[tempcnum]] = true
+			}
+		}
+	}
+	fmt.Printf("--- Processed commit %v for node %v.\n", tempcnum, m.NodeName)
+	conn.Write([]byte("OK"))
+	conn.Close()
 	for name, id := range client {
-		if id != client[m.Name] {
-			sendTestRequest(name, id, cnum, m.Model)
+		if id != client[m.NodeName] {
+			sendTestRequest(name, id, tempcnum, m.Model)
 		}
 	}
 }
 
+// Function that sends test requests via TCP
 func sendTestRequest(name string, id, tcnum int, tmodel bclass.Model) {
-	//create test request
-	msg := message{tcnum, myaddr.String(), "server", "test_request", 0, 0, tmodel, gempty}
-	//increment tests in queue for that node
-	if queue, ok := testqueue[id]; !ok {
-		queue := make(map[int]bool)
-		queue[cnumhist[tcnum]] = true
-		testqueue[id] = queue
-	} else {
-		queue[cnumhist[tcnum]] = true
-	}
+	//create test request (sanitized)
+	msg := message{tcnum, "server", "server", "test_request", 0, 0, tmodel, gempty}
 	//send the request
 	fmt.Printf("--> Sending test request from %v to %v.", cnumhist[tcnum], name)
 	err := tcpSend(claddr[id], msg)
 	if err != nil {
-		fmt.Printf(" [NO!]\n*** Could not send test request to %v.\n", name)
+		fmt.Printf(" [NO]\n*** Could not send test request to %v.\n", name)
 	}
 }
 
+// Function to forward global model
 func sendGlobal(m message) {
-	fmt.Printf("--> Sending global model to %v.", m.Name)
-	msg := message{m.Id, myaddr.String(), "server", "global_grant", 0, 0, m.Model, gmodel}
-	tcpSend(claddr[client[m.Name]], msg)
+	fmt.Printf("--> Sending global model to %v.", m.NodeName)
+	msg := message{m.Id, "server", "server", "global_grant", 0, 0, m.Model, gmodel}
+	tcpSend(claddr[client[m.NodeName]], msg)
 }
 
+// Function for sending messages to nodes via TCP
 func tcpSend(addr *net.TCPAddr, msg message) error {
-	p := make([]byte, 1024)
+	p := make([]byte, BUFFSIZE)
 	conn, err := net.DialTCP("tcp", nil, addr)
-	//checkError(err)
 	if err == nil {
 		outbuf := logger.PrepareSend(msg.Type, msg)
 		_, err = conn.Write(outbuf)
 		//checkError(err)
 		n, _ := conn.Read(p)
 		if string(p[:n]) != "OK" {
-			fmt.Printf(" [NO!]\n<-- Request was denied by node: %v.\nEnter command: ", string(p[:n]))
+			fmt.Printf(" [NO]\n<-- Request was denied by node: %v.\nEnter command: ", string(p[:n]))
 		} else {
 			fmt.Printf(" [OK]\n")
 		}
@@ -197,6 +228,7 @@ func tcpSend(addr *net.TCPAddr, msg message) error {
 	return err
 }
 
+// Function that checks the testqueue for outstanding tests
 func checkQueue(id int) bool {
 	flag := true
 	for _, v := range testqueue[id] {
@@ -207,32 +239,39 @@ func checkQueue(id int) bool {
 	return flag
 }
 
+// Function that processes join requests
 func processJoin(m message) {
 	//process depending on if it is a new node or a returning one
-	if _, ok := client[m.Name]; !ok {
+	if _, ok := client[m.NodeName]; !ok {
 		//adding a node that has never been added before
 		id := maxnode
 		maxnode++
-		client[m.Name] = id
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
-		fmt.Printf("--- Added %v as node%v.\n", m.Name, id)
+		client[m.NodeName] = id
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
+		fmt.Printf("--- Added %v as node%v.\n", m.NodeName, id)
+		queue := make(map[int]bool)
+		for k, _ := range tempmodel {
+			queue[k] = true
+		}
+		testqueue[id] = queue
 		for _, v := range tempmodel {
-			sendTestRequest(m.Name, id, v.cnum, v.model)
+			sendTestRequest(m.NodeName, id, v.cnum, v.model)
 		}
 	} else {
 		//node is rejoining, update address and resend the unfinished test requests
-		id := client[m.Name]
-		claddr[id], _ = net.ResolveTCPAddr("tcp", m.Ip)
-		fmt.Printf("--- %v at node%v is back online.\n", m.Name, id)
+		id := client[m.NodeName]
+		claddr[id], _ = net.ResolveTCPAddr("tcp", m.NodeIp)
+		fmt.Printf("--- %v at node%v is back online.\n", m.NodeName, id)
 		for k, v := range testqueue[id] {
 			if v {
-				aggregate := tempmodel[k]
-				sendTestRequest(m.Name, id, aggregate.cnum, aggregate.model)
+				aggregatesendtest := tempmodel[k]
+				sendTestRequest(m.NodeName, id, aggregatesendtest.cnum, aggregatesendtest.model)
 			}
 		}
 	}
 }
 
+// Input parser
 func parseArgs() {
 	flag.Parse()
 	inputargs := flag.Args()
@@ -245,18 +284,6 @@ func parseArgs() {
 	checkError(err)
 	logger = govec.Initialize(inputargs[1], inputargs[1])
 }
-
-//func getNodeAddr(slavefile string) {
-//	dat, err := ioutil.ReadFile(slavefile)
-//	checkError(err)
-//	nodestr := strings.Split(string(dat), "\n")
-//	for i := 0; i < len(nodestr)-1; i++ {
-//		nodeaddr := strings.Split(nodestr[i], " ")
-//		client[nodeaddr[0]] = i
-//		claddr[i], _ = net.ResolveTCPAddr("tcp", nodeaddr[1])
-//		//testqueue[i] = 0
-//	}
-//}
 
 func checkError(err error) {
 	if err != nil {
