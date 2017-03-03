@@ -7,20 +7,24 @@
 #include "engine.h"
 #include "_cgo_export.h"
 
-#define BUFSIZE 2048
+#define MATLAB_FUNCTION_PATH "C:/work/src/github.com/4180122/distbayes/distmlMatlab/matlabfunctions"
+
 void ReadData(Engine *ep, char *x, char *y){
-    mxArray *yin = NULL, *xin = NULL;
+    mxArray *yin = NULL, *xin = NULL, *fpath = NULL;
 
     xin = mxCreateString(x);
     yin = mxCreateString(y);
+    fpath = mxCreateString(MATLAB_FUNCTION_PATH);
     engPutVariable(ep, "xin", xin);
     engPutVariable(ep, "yin", yin);
-    engEvalString(ep, "addpath('C:/work/src/github.com/4180122/distbayes/distmlMatlab/matlabfunctions');");
-    engEvalString(ep, "cd C:/work/src/github.com/4180122/distbayes/distmlMatlab/matlabfunctions");
+    engPutVariable(ep, "f_path", fpath);
+    engEvalString(ep, "addpath(f_path);");
+    engEvalString(ep, "cd(f_path)");
     engEvalString(ep, "[x, y] = ReadData(xin,yin);");
 
  	mxDestroyArray(xin);
  	mxDestroyArray(yin);
+ 	mxDestroyArray(fpath);
 }
 
 double* FitModel(Engine *ep, double *paramlen){
@@ -82,13 +86,15 @@ void PushModel(Engine *ep, double *model, int paramlen, double *rvec, int veclen
 }
 
 void InitializeGlobal(Engine *ep, double nodes, double modelD) {
-    mxArray *N = NULL, *D = NULL;
+    mxArray *N = NULL, *D = NULL, *fpath = NULL;
     N = mxCreateDoubleScalar(nodes);
     D = mxCreateDoubleScalar(modelD);
+    fpath = mxCreateString(MATLAB_FUNCTION_PATH);
     engPutVariable(ep, "N", N);
     engPutVariable(ep, "D", D);
-    engEvalString(ep, "addpath('C:/work/src/github.com/4180122/distbayes/distmlMatlab/matlabfunctions');");
-    engEvalString(ep, "cd C:/work/src/github.com/4180122/distbayes/distmlMatlab/matlabfunctions");
+    engPutVariable(ep, "f_path", fpath);
+    engEvalString(ep, "addpath(f_path);");
+    engEvalString(ep, "cd(f_path)");
     engEvalString(ep, "gmodel.models = cell(N,1)");
     engEvalString(ep, "gmodel.a = zeros(N,1)");
     engEvalString(ep, "R = zeros(N,N)");

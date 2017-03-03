@@ -5,8 +5,6 @@ import (
 	"unsafe"
 )
 
-//#cgo CFLAGS: -m64 -Dchar16_t=uint16_t -DmxUint64=uint64_t -DmxInt64=int64_t -I include -Wl,--export-all-symbolse
-
 /*
 #cgo CFLAGS: -m64 -Dchar16_t=uint16_t -I include -Wl,--export-all-symbolse
 #cgo LDFLAGS: -L lib -lmex -lmx -leng -lmat
