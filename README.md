@@ -1,7 +1,5 @@
-# distbayes
-This project is protoype of a secured distributed ML framework using naive Bayesian classification, designed in partial fulfillment of CPSC538B 2016W1 Course Project.
-
-This prototype shows the feasibility of data mining on highly sensitive distributed data and is aimed at applications where data security is paramount and thus data cannot be transferred from one node to another. The prototype is designed in such a way that multiple local statistical classification models are aggregated and incorporated into a global model at a centralized server using a Bayesian model averaging technique. The implementation of the prototype also includes a fault-tolerant implementation in which the server functions are replicated using the [Raft](https://raft.github.io/) consensus algorithm.
+# InsuLearn
+InsuLearn is an intuitive and robust distributed system designed to perform regression and classification on medical data, while preserving data security and privacy.  InsuLearn is built on ensemble learning, in which statistical models are developed at each institution independently and combined at secure coordinator nodes. InsuLearn protocols are designed such that the liveness of the system is guaranteed as institutions join and leave the network. Coordination is implemented as a cluster of replicated state machines, making it tolerant to individual node failures.  Fault-tolerant replication is achieved using the [Raft](https://raft.github.io/) consensus algorithm.
 
 * bclass/       : A simple classification library and Bayesian aggregation scheme implemented in Go
 * client/       : Examples of different client implementations using the bclass or distmlMatlab libraries with and without replication, some of which are instrumented with GoVector
@@ -15,13 +13,9 @@ The Go only implementations which use the bclass library is cross-platform compa
 
 ## Installation
 
-To use distbayes you must have a correctly configured go development environment, see [How to write Go Code](https://golang.org/doc/code.html)
+To use InsuLearn you must have a correctly configured go development environment, see [How to write Go Code](https://golang.org/doc/code.html)
 
-Once you set up your environment, distbayes can be installed with the go tool command:
-
-```
-go get github.com/4180122/distbayes
-```
+Once you set up your environment, InsuLearn can be installed into the designated GOPATH directory.
 
 #### bclass Dependencies (Cross-Platform 64 bit)
 The bclass polynomial classification library require the [gonum matrix library](https://github.com/gonum/matrix), which can also be installed with the go tool command:
@@ -38,13 +32,13 @@ The following steps are required to enable communication between Go and MATLAB v
  4. Create the following symbolic links because the cgo linker does not play well with windows paths (must be done with Administrative privilages):
 
 	```
-	mklink /D <distbayes_root_directory>\include <matlab_install_directory>\extern\incldue
+	mklink /D <InsuLearn_root_directory>\include <matlab_install_directory>\extern\incldue
 	
-	mklink /D <distbayes_root_directory>\distmlMatlab\include <matlab_install_directory>\extern\incldue
+	mklink /D <InsuLearn_root_directory>\distmlMatlab\include <matlab_install_directory>\extern\incldue
 	
-	mklink /D <distbayes_root_directory>\lib <matlab_install_directory>\bin\win64
+	mklink /D <InsuLearn_root_directory>\lib <matlab_install_directory>\bin\win64
 	
-	mklink /D <distbayes_root_directory>\distmlMatlab\lib <matlab_install_directory>\bin\win64 
+	mklink /D <InsuLearn_root_directory>\distmlMatlab\lib <matlab_install_directory>\bin\win64 
 	```
  5. Ensure that the distmlMatlab\matlabfunctions\ folder has write privilages
  6. Update MATLAB_FUNCTION_PATH in distmlMatlab\matlabfun.c to the distmlMatlab\matlabfunctions folder
@@ -76,34 +70,34 @@ The implementation of the client prompts the user for the following commands.
 Here are a list of command line arguments that need to be passed to each example program.
 
 #### client
-* name            : A string representing the unique name of the node in the system
-* ip:port         : Address that the client uses to listen to the server
-* ip:port         : Address of the server
-* train_data.txt  : Name of the file containing the features of training data used to train the local model
-* train_label.txt : Name of the file containing the labels of training data used to train the local model
-* test_data.txt   : Name of the file containing the features of testing data used to test the local and global models
-* test_label.txt  : Name of the file containing the labels of testing data used to test the local and global models
-* id              : A string representing the name of the node for GoVec log
+* name           : A string representing the unique name of the node in the system
+* ip:port        : Address that the client uses to listen to the server
+* ip:port        : Address of the server
+* train_data.txt       : Name of the file containing the features of training data used to train the local model
+* train_label.txt      : Name of the file containing the labels of training data used to train the local model
+* test_data.txt       : Name of the file containing the features of testing data used to test the local and global models
+* test_label.txt      : Name of the file containing the labels of training data used to train the local and global models
+* id             : A string representing the name of the node for GoVec log
 
 #### client_raft
-* name            : A string representing the unique name of the node in the system
-* ip:port         : Address that the client uses to listen to the server
-* serverlist.txt  : Name of the file containing addresses of the servers (ip:port)
-* train_data.txt  : Name of the file containing the features of training data used to train the local model
-* train_label.txt : Name of the file containing the labels of training data used to train the local model
-* test_data.txt   : Name of the file containing the features of testing data used to test the local and global models
-* test_label.txt  : Name of the file containing the labels of testing data used to test the local and global 
-* id              : A string representing the name of the node for GoVec log
+* name           : A string representing the unique name of the node in the system
+* ip:port        : Address that the client uses to listen to the server
+* serverlist.txt : Name of the file containing addresses of the servers (ip:port)
+* train_data.txt       : Name of the file containing the features of training data used to train the local model
+* train_label.txt      : Name of the file containing the labels of training data used to train the local model
+* test_data.txt       : Name of the file containing the features of testing data used to test the local and global models
+* test_label.txt      : Name of the file containing the labels of training data used to train the local and global 
+* id             : A string representing the name of the node for GoVec log
 
 #### server
-* ip:port         : Address that the server uses to listen to the server
-* id              : A string representing the name of the server for GoVec log
+* ip:port        : Address that the server uses to listen to the server
+* id             : A string representing the name of the server for GoVec log
 
 #### server_raft
-* ip:port         : Address that the server uses to listen to the server
-* raftlist.txt    : Name of the file containing addresses that the raft servers use to communicate to each other (ip:port)
-* index           : Integer number mapping this server to an entry in the raftlist.txt
-* id              : A string representing the name of the hospital for GoVec log
+* ip:port        : Address that the server uses to listen to the server
+* raftlist.txt   : Name of the file containing addresses that the raft servers use to communicate to each other (ip:port)
+* index          : Integer number mapping this server to an entry in the raftlist.txt
+* id             : A string representing the name of the hospital for GoVec log
 
 ## Scripts
 #### bclass (Cross-Platform 64 bit)
