@@ -1,5 +1,24 @@
 # InsuLearn
-InsuLearn is an intuitive and robust distributed system designed to perform regression and classification on medical data, while preserving data security and privacy.  InsuLearn is built on ensemble learning, in which statistical models are developed at each institution independently and combined at secure coordinator nodes. InsuLearn protocols are designed such that the liveness of the system is guaranteed as institutions join and leave the network. Coordination is implemented as a cluster of replicated state machines, making it tolerant to individual node failures.  Fault-tolerant replication is achieved using the [Raft](https://raft.github.io/) consensus algorithm.
+InsuLearn is an intuitive and robust distributed system designed to perform regression and classification on medical data, while preserving data security and privacy. You can read a published paper that describes the project:
+
+[*Scalable and Fault Tolerant Platform for Distributed Learning on Private Medical Data*](https://www.cs.ubc.ca/~bestchai/papers/mlmi17-distributed-ml.pdf). Alborz Amir-Khalili, Soheil Kianzad, Rafeef Abugharbieh, Ivan Beschastnikh. MICCAI MLMI 2017
+```
+@inproceedings{AmirKhalili2017,
+  author    = {Alborz Amir{-}Khalili and Soheil Kianzad and Rafeef Abugharbieh and Ivan Beschastnikh},
+  title     = {{Scalable and Fault Tolerant Platform for Distributed Learning on Private Medical Data}},
+  booktitle = {Machine Learning in Medical Imaging - 8th International Workshop,
+               {MLMI} 2017, Held in Conjunction with {MICCAI} 2017},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {10541},
+  pages     = {176--184},
+  publisher = {Springer},
+  year      = {2017},
+  url       = {https://doi.org/10.1007/978-3-319-67389-9\_21},
+}
+```
+
+
+InsuLearn is built on ensemble learning, in which statistical models are developed at each institution independently and combined at secure coordinator nodes. InsuLearn protocols are designed such that the liveness of the system is guaranteed as institutions join and leave the network. Coordination is implemented as a cluster of replicated state machines, making it tolerant to individual node failures.  Fault-tolerant replication is achieved using the [Raft](https://raft.github.io/) consensus algorithm.
 
 * bclass/       : A simple classification library and Bayesian aggregation scheme implemented in Go
 * client/       : Examples of different client implementations using the bclass or distmlMatlab libraries with and without replication, some of which are instrumented with GoVector
